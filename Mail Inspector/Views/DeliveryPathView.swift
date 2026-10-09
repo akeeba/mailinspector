@@ -75,10 +75,10 @@ private struct DeliveryHopRow: View {
                     if let tlsVersion = hop.tlsVersion {
                         detail("TLS", tlsVersion + (hop.tlsCipher.map { " (\($0))" } ?? ""))
                     }
-                    ForEach(Array(hop.warnings.enumerated()), id: \.offset) { _, warning in
-                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    ForEach(hop.flags) { flag in
+                        Label(flag.message, systemImage: flag.severity.symbolName)
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(flag.severity.tintColor)
                     }
                     Text(hop.rawHeaderText)
                         .font(.system(.caption, design: .monospaced))
@@ -104,9 +104,9 @@ private struct DeliveryHopRow: View {
                         }
                     }
                     Spacer()
-                    if !hop.warnings.isEmpty {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                    if let worstSeverity {
+                        Image(systemName: worstSeverity.symbolName)
+                            .foregroundStyle(worstSeverity.tintColor)
                     }
                     trustBadge
                 }
@@ -114,8 +114,15 @@ private struct DeliveryHopRow: View {
         }
     }
 
+    /// The most severe flag on this hop, if any — drives the leading dot's color and the
+    /// trailing icon in the row's label, so a hop with only notices never looks as alarming as
+    /// one with an actual warning.
+    private var worstSeverity: ObservationSeverity? {
+        hop.flags.map(\.severity).max()
+    }
+
     private var dotColor: Color {
-        if !hop.warnings.isEmpty { return .orange }
+        if let worstSeverity { return worstSeverity.tintColor }
         if hop.isTrusted == true { return .green }
         return .secondary
     }

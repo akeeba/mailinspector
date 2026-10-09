@@ -28,22 +28,26 @@ struct DeliveryPathAnalyzerTests {
         #expect(analysis.hops[2].claimedFromHostname == "hop3.example")
     }
 
-    @Test("Flags a hop whose timestamp is earlier than the previous hop's as chronologically inconsistent")
+    @Test("Flags a hop whose timestamp is earlier than the previous hop's as chronologically inconsistent, at warning severity")
     func flagsChronologicalInconsistency() throws {
         let raw = "Received: from newer.example by final.example; Mon, 2 Jan 2006 00:00:00 +0000\r\n" +
             "Received: from older.example by newer.example; Wed, 4 Jan 2006 00:00:00 +0000\r\n\r\n"
         let message = try makeTestMessage(raw)
         let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
-        #expect(analysis.hops[1].warnings.contains { $0.contains("chronologically inconsistent") })
+        let flag = analysis.hops[1].flags.first { $0.message.contains("chronologically inconsistent") }
+        #expect(flag != nil)
+        #expect(flag?.severity == .warning)
     }
 
-    @Test("Flags an unusually long transit delay between consecutive hops")
+    @Test("Flags an unusually long transit delay between consecutive hops, at notable (not warning) severity")
     func flagsLongTransitDelay() throws {
         let raw = "Received: from newer.example by final.example; Wed, 4 Jan 2006 00:00:00 +0000\r\n" +
             "Received: from older.example by newer.example; Mon, 2 Jan 2006 00:00:00 +0000\r\n\r\n"
         let message = try makeTestMessage(raw)
         let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
-        #expect(analysis.hops[1].warnings.contains { $0.contains("unusually long") })
+        let flag = analysis.hops[1].flags.first { $0.message.contains("unusually long") }
+        #expect(flag != nil)
+        #expect(flag?.severity == .notable)
     }
 
     @Test("Does not flag a leading run of private-use hops, since that's how most SaaS senders normally relay internally before reaching the public internet")
@@ -55,11 +59,11 @@ struct DeliveryPathAnalyzerTests {
         let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
         #expect(analysis.hops[0].fromIPScope == .privateUse)
         #expect(analysis.hops[1].fromIPScope == .privateUse)
-        #expect(analysis.hops[0].warnings.isEmpty)
-        #expect(analysis.hops[1].warnings.isEmpty)
+        #expect(analysis.hops[0].flags.isEmpty)
+        #expect(analysis.hops[1].flags.isEmpty)
     }
 
-    @Test("Flags a private-use sending IP address that appears after the message already reached the public internet")
+    @Test("Flags a private-use sending IP address that appears after the message already reached the public internet, as a notice rather than a warning — this is routine for SaaS senders, not evidence of anything")
     func flagsPrivateIPAfterPublicHop() throws {
         // 8.8.8.8 and 1.1.1.1 are genuinely public IPs (unlike the RFC 5737 documentation/
         // test-net ranges, which this app's own classifier correctly treats as non-public).
@@ -69,7 +73,29 @@ struct DeliveryPathAnalyzerTests {
         let message = try makeTestMessage(raw)
         let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
         #expect(analysis.hops[1].fromIPScope == .privateUse)
-        #expect(analysis.hops[1].warnings.contains { $0.contains("private-use") })
+        let flag = analysis.hops[1].flags.first { $0.message.contains("private-use") }
+        #expect(flag != nil)
+        #expect(flag?.severity == .notable)
+    }
+
+    @Test("Flags an unresolvable reverse-DNS hostname as a notice, not a warning — unresolvable reverse DNS is routine for internal SaaS infrastructure")
+    func unresolvableReverseDNSIsANotice() throws {
+        let raw = "Received: from mail.example.com (unknown [198.51.100.7]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
+        let flag = analysis.hops[0].flags.first { $0.message.contains("could not verify the sending hostname") }
+        #expect(flag != nil)
+        #expect(flag?.severity == .notable)
+    }
+
+    @Test("Flags a claimed hostname that contradicts reverse DNS as a warning — this is the genuinely forged-looking case")
+    func forgedLookingHostnameMismatchIsAWarning() throws {
+        let raw = "Received: from totally-different.example (actual-ptr.evil.example [203.0.113.5]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
+        let flag = analysis.hops[0].flags.first { $0.message.contains("does not match") }
+        #expect(flag != nil)
+        #expect(flag?.severity == .warning)
     }
 
     @Test("Marks only the trusted suffix of hops as trusted, stopping at the first non-matching hop")

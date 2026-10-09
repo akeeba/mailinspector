@@ -212,11 +212,21 @@ struct ReportExportView: View {
             if let timestamp = hop.timestamp {
                 staticLine("Timestamp: \(timestamp.formatted(date: .abbreviated, time: .standard))")
             }
-            ForEach(Array(hop.warnings.enumerated()), id: \.offset) { _, warning in
-                Text("⚠ \(warning)")
+            ForEach(hop.flags) { flag in
+                Text("\(flagMarker(for: flag.severity)) \(flag.message)")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(flag.severity.tintColor)
             }
+        }
+    }
+
+    /// A plain-text marker standing in for the on-screen SF Symbol, matching this flag's
+    /// severity — warnings and notices should read as visually distinct on paper too.
+    private func flagMarker(for severity: ObservationSeverity) -> String {
+        switch severity {
+        case .warning: return "⚠"
+        case .notable: return "ℹ"
+        case .info: return "•"
         }
     }
 

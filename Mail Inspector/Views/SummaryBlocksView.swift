@@ -45,8 +45,8 @@ struct SummaryBlocksView: View {
             SummaryBlock(
                 title: "Hops",
                 value: "\(deliveryPath.hops.count)",
-                systemImage: hopsHaveWarnings ? "exclamationmark.triangle.fill" : nil,
-                tintColor: hopsHaveWarnings ? .orange : .primary,
+                systemImage: worstHopSeverity?.symbolName,
+                tintColor: worstHopSeverity?.tintColor ?? .primary,
                 action: onTapHops
             )
             if let spamAssessment {
@@ -61,8 +61,11 @@ struct SummaryBlocksView: View {
         }
     }
 
-    private var hopsHaveWarnings: Bool {
-        deliveryPath.hops.contains { !$0.warnings.isEmpty }
+    /// The most severe flag across every hop, if any. A path with only notices (routine internal
+    /// SaaS routing, unresolvable reverse DNS, etc.) should never look like a warning the way an
+    /// actually inconsistent or forged-looking hop should.
+    private var worstHopSeverity: ObservationSeverity? {
+        deliveryPath.hops.flatMap(\.flags).map(\.severity).max()
     }
 
     private func spamTintColor(for percentage: Double) -> Color {

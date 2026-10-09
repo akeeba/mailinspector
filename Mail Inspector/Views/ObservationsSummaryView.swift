@@ -22,8 +22,8 @@ struct ObservationsSummaryView: View {
                     HStack(alignment: .top, spacing: 8) {
                         // Severity is otherwise conveyed only by icon shape and color, which
                         // VoiceOver can't see — give it an explicit spoken label.
-                        Image(systemName: symbolName(for: observation.severity))
-                            .foregroundStyle(color(for: observation.severity))
+                        Image(systemName: observation.severity.symbolName)
+                            .foregroundStyle(observation.severity.tintColor)
                             .frame(width: 18)
                             .accessibilityLabel(accessibilityLabel(for: observation.severity))
                         VStack(alignment: .leading, spacing: 2) {
@@ -39,22 +39,6 @@ struct ObservationsSummaryView: View {
             }
             .padding(12)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
-        }
-    }
-
-    private func symbolName(for severity: ObservationSeverity) -> String {
-        switch severity {
-        case .warning: return "exclamationmark.triangle.fill"
-        case .notable: return "info.circle.fill"
-        case .info: return "checkmark.circle"
-        }
-    }
-
-    private func color(for severity: ObservationSeverity) -> Color {
-        switch severity {
-        case .warning: return .orange
-        case .notable: return .blue
-        case .info: return .secondary
         }
     }
 

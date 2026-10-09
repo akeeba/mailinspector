@@ -20,6 +20,21 @@ nonisolated enum IPAddressScope: String, Sendable {
     case documentationOrReserved
 }
 
+/// A single per-hop issue found while parsing or cross-referencing a hop against its neighbors.
+///
+/// Severity matters here specifically because most real-world delivery paths — anything sent
+/// through a SaaS provider — routinely include internal hostnames, private-network IPs, and
+/// hops whose reverse DNS doesn't resolve, simply because of how those providers relay mail
+/// internally before it reaches the public internet. None of that is inherently suspicious, so
+/// it's `.notable` ("worth knowing"), not `.warning`. Only a hop that looks actively
+/// inconsistent or forged — a claimed hostname that contradicts reverse DNS, or a timestamp that
+/// contradicts the hop before it — is `.warning`.
+nonisolated struct DeliveryHopFlag: Sendable, Identifiable, Hashable {
+    let id: Int
+    let severity: ObservationSeverity
+    let message: String
+}
+
 /// One `Received:` header, parsed into its conventional (not formally standardized) fields.
 ///
 /// `id` orders hops oldest (first sent) to newest (most recent, closest to this app's import) —
@@ -50,7 +65,7 @@ nonisolated struct DeliveryHop: Sendable, Identifiable {
     /// (malformed timestamp, chronological inconsistency, unusually long transit delay, claimed
     /// vs. verified hostname mismatch, private/loopback address, etc). Always phrased as an
     /// observation, never as proof of anything — see `DeliveryPathAnalyzer`'s documentation.
-    let warnings: [String]
+    let flags: [DeliveryHopFlag]
 
     /// Whether this hop is attributable to infrastructure the user has told the app to trust
     /// (see `InspectorSettings.trustedAuthServIDs`), or `nil` when that can't be determined at

@@ -48,13 +48,27 @@ nonisolated enum DeliveryPathAnalyzer {
         }
 
         for (index, parsedHop) in parsedOldestFirst.enumerated() {
-            var warnings = parsedHop.parseWarnings
+            var flags: [DeliveryHopFlag] = []
+            var nextFlagID = 0
+            func addFlag(_ severity: ObservationSeverity, _ message: String) {
+                flags.append(DeliveryHopFlag(id: nextFlagID, severity: severity, message: message))
+                nextFlagID += 1
+            }
+
+            // Parser-level issues (missing "from" clause, unparseable timestamp) are about the
+            // header's shape, not evidence of anything — most real-world headers that trip these
+            // are just unusual MTA formatting, not forgery.
+            for warning in parsedHop.parseWarnings {
+                addFlag(.notable, warning)
+            }
 
             let ipScope = parsedHop.fromIPAddress.flatMap(IPAddressClassifier.classify)
             if let ipScope, ipScope != .publicAddress {
                 if hasSeenPublicAddress {
                     let description = Self.describe(ipScope)
-                    warnings.append("Sending address \(parsedHop.fromIPAddress ?? "") is \(description), not a public internet address — unusual this late in the chain, after the message had already reached the public internet.")
+                    // A private/internal-network hop this late is routine for SaaS senders
+                    // (internal relay hopping between services) — worth knowing, not alarming.
+                    addFlag(.notable, "Sending address \(parsedHop.fromIPAddress ?? "") is \(description), not a public internet address — unusual this late in the chain, after the message had already reached the public internet.")
                 }
             } else if ipScope == .publicAddress {
                 hasSeenPublicAddress = true
@@ -64,18 +78,25 @@ nonisolated enum DeliveryPathAnalyzer {
                verified.caseInsensitiveCompare("unknown") != .orderedSame,
                claimed.caseInsensitiveCompare(verified) != .orderedSame,
                !claimed.contains(verified), !verified.contains(claimed) {
-                warnings.append("Claimed sending hostname \u{201c}\(claimed)\u{201d} does not match \u{201c}\(verified)\u{201d}, which the receiving server found via reverse DNS.")
+                // The claimed hostname actively contradicts what reverse DNS found — this is the
+                // "obviously forged" case, a genuine warning.
+                addFlag(.warning, "Claimed sending hostname \u{201c}\(claimed)\u{201d} does not match \u{201c}\(verified)\u{201d}, which the receiving server found via reverse DNS.")
             } else if parsedHop.verifiedFromHostname?.caseInsensitiveCompare("unknown") == .orderedSame {
-                warnings.append("The receiving server could not verify the sending hostname via reverse DNS.")
+                // An unresolvable reverse DNS lookup is extremely common for internal SaaS
+                // infrastructure and tells you nothing by itself — a notice, not a warning.
+                addFlag(.notable, "The receiving server could not verify the sending hostname via reverse DNS.")
             }
 
             if index > 0, let previousTimestamp = parsedOldestFirst[index - 1].timestamp, let timestamp = parsedHop.timestamp {
                 let delta = timestamp.timeIntervalSince(previousTimestamp)
                 if delta < 0 {
-                    warnings.append("This hop's timestamp is earlier than the previous hop's, which is chronologically inconsistent.")
+                    // A hop claiming to have happened before the one before it is a genuine
+                    // inconsistency — on par with the forged-hostname case, a warning.
+                    addFlag(.warning, "This hop's timestamp is earlier than the previous hop's, which is chronologically inconsistent.")
                 } else if delta > longTransitThreshold {
                     let hours = Int(delta / 3600)
-                    warnings.append("Transit from the previous hop took about \(hours) hours, which is unusually long.")
+                    // Slow transit is usually queueing, retries, or greylisting — not forgery.
+                    addFlag(.notable, "Transit from the previous hop took about \(hours) hours, which is unusually long.")
                 }
             }
 
@@ -92,14 +113,14 @@ nonisolated enum DeliveryPathAnalyzer {
                 tlsCipher: parsedHop.tlsCipher,
                 timestampRaw: parsedHop.timestampRaw,
                 timestamp: parsedHop.timestamp,
-                warnings: warnings,
+                flags: flags,
                 isTrusted: trust[index]
             )
             hops.append(hop)
 
             let hopLabel = parsedHop.claimedFromHostname ?? parsedHop.fromIPAddress ?? "Hop \(index + 1)"
-            for warning in warnings {
-                addObservation(.notable, "Delivery hop: \(hopLabel)", warning)
+            for flag in flags {
+                addObservation(flag.severity, "Delivery hop: \(hopLabel)", flag.message)
             }
         }
 
