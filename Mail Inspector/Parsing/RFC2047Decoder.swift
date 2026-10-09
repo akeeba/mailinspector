@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import Foundation
 
 /// Decodes RFC 2047 encoded-words (`=?charset?B?...?=` / `=?charset?Q?...?=`) that commonly

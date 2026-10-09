@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import Foundation
 
 /// Apple Mail stores messages on disk as `.emlx`: a leading ASCII line giving the byte length of

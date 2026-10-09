@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import SwiftUI
 
 /// Section C: the message's apparent delivery path, oldest to newest.
@@ -131,7 +138,7 @@ private struct DeliveryHopRow: View {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 120, alignment: .leading)
+                .frame(minWidth: 120, alignment: .leading)
             Text(value)
                 .font(.system(.caption, design: .monospaced))
                 .textSelection(.enabled)

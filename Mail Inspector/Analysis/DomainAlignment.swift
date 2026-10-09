@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import Foundation
 
 /// Compares domains both exactly and at the "organizational domain" level (e.g. `mail.example.com`

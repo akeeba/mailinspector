@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import SwiftUI
 
 /// Section B: SPF, DKIM, and DMARC, as reported by mail servers.
@@ -273,7 +280,7 @@ private struct DKIMSignatureRow: View {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 110, alignment: .leading)
+                .frame(minWidth: 110, alignment: .leading)
             Text(value)
                 .font(.system(.caption, design: .monospaced))
                 .textSelection(.enabled)

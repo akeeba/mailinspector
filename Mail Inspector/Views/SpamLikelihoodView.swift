@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import SwiftUI
 
 /// Shown only when the user has opted in (Settings → "Trust server spam headers") and a known

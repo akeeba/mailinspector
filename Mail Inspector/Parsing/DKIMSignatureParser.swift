@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import Foundation
 
 /// Parses `DKIM-Signature` headers (RFC 6376 §3.5): a semicolon-separated `tag=value` list.

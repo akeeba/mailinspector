@@ -1,3 +1,10 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
 import AppKit
 
 /// Handles app-lifecycle events SwiftUI's `App` protocol doesn't expose directly — specifically,
