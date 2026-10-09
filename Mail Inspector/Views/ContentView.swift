@@ -19,6 +19,7 @@ struct ContentView: View {
     @Environment(PendingImportQueue.self) private var pendingImports
     @Environment(FileOpenRequest.self) private var fileOpenRequest
     @Environment(ReportExportRequest.self) private var reportExportRequest
+    @Environment(AIInsightsSessionCache.self) private var aiInsightsSessionCache
 
     private var selectedMessage: EmailMessage? {
         messages.first { $0.id == selection }
@@ -164,7 +165,7 @@ struct ContentView: View {
     /// user pick where to save the rendered report instead of just writing it somewhere fixed.
     private func exportSelectedMessageAsPDF() {
         guard let message = selectedMessage,
-              let pdfData = ReportPDFExporter.renderPDF(for: message, settings: settings, pageSize: settings.reportPageSize) else { return }
+              let pdfData = ReportPDFExporter.renderPDF(for: message, settings: settings, pageSize: settings.reportPageSize, aiInsights: aiExportSummary(for: message)) else { return }
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
@@ -187,7 +188,7 @@ struct ContentView: View {
     /// rather than opaque in-memory data.
     private func shareSelectedMessageAsPDF() {
         guard let message = selectedMessage,
-              let pdfData = ReportPDFExporter.renderPDF(for: message, settings: settings, pageSize: settings.reportPageSize) else { return }
+              let pdfData = ReportPDFExporter.renderPDF(for: message, settings: settings, pageSize: settings.reportPageSize, aiInsights: aiExportSummary(for: message)) else { return }
 
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -216,6 +217,21 @@ struct ContentView: View {
     private func remove(_ id: EmailMessage.ID) {
         messages.removeAll { $0.id == id }
         if selection == id { selection = nil }
+        aiInsightsSessionCache.removeSession(for: id)
+    }
+
+    /// Only ever produces a result if the score/analysis were already generated while viewing
+    /// this message — exporting never triggers Apple Intelligence itself, so a message that was
+    /// never opened in the detail view simply exports without this section.
+    private func aiExportSummary(for message: EmailMessage) -> AIInsightsExportSummary? {
+        guard settings.isAIInsightsEnabled else { return nil }
+        guard #available(macOS 27, *) else { return nil }
+        guard let session = aiInsightsSessionCache.existingSession(for: message.id) as? MessageInsightsSession,
+              let assessment = session.assessment,
+              let analysisText = session.prefabAnalysis else {
+            return nil
+        }
+        return AIInsightsExportSummary(score: assessment.score, rationale: assessment.rationale, analysisText: analysisText)
     }
 
     /// Extracts plain file URLs from a Finder-origin drag. Applied directly to the sidebar list

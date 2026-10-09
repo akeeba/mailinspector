@@ -33,13 +33,13 @@ enum ReportPDFExporter {
     private static let margin: CGFloat = 36
     private static let footerHeight: CGFloat = 16
 
-    static func renderPDF(for message: EmailMessage, settings: InspectorSettings, pageSize: ReportPageSize) -> Data? {
+    static func renderPDF(for message: EmailMessage, settings: InspectorSettings, pageSize: ReportPageSize, aiInsights: AIInsightsExportSummary? = nil) -> Data? {
         let page = pageSize.pointSize
         let contentWidth = page.width - margin * 2
         let contentHeight = page.height - margin * 2 - footerHeight
         let blockSpacing = ReportExportView.blockSpacing
 
-        let blocks = ReportExportView(message: message, settings: settings).blocks
+        let blocks = ReportExportView(message: message, settings: settings, aiInsights: aiInsights).blocks
         guard !blocks.isEmpty else { return nil }
 
         let heights = blocks.map { measureHeight(of: $0, width: contentWidth) }

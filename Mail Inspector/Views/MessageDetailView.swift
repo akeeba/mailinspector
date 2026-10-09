@@ -14,6 +14,7 @@ struct MessageDetailView: View {
     /// keyboard-navigable without requiring focus to be back on the sidebar list first.
     let onDelete: () -> Void
     @Environment(InspectorSettings.self) private var settings
+    @Environment(AIInsightsSessionCache.self) private var aiInsightsSessionCache
     @State private var scrollPosition = ScrollPosition()
     @State private var scrollMetrics = ScrollMetrics()
 
@@ -71,8 +72,38 @@ struct MessageDetailView: View {
         case authentication
         case spam
         case deliveryPath
+        case aiInsights
         case additionalHeaders
         case rawHeaders
+    }
+
+    /// Reads through the cache (not a local `@State`) so this reflects the real,
+    /// possibly-still-in-flight `MessageInsightsSession` for this exact message, and so
+    /// `SummaryBlocksView`'s AI block updates automatically once the score is ready — the
+    /// `.assessment?.score` read below is itself what makes this view's body depend on that
+    /// `@Observable` session, however it was obtained.
+    private var aiLegitimacyScore: Int? {
+        guard settings.isAIInsightsEnabled else { return nil }
+        guard #available(macOS 27, *) else { return nil }
+        guard case .available = AIInsightsAvailability.current else { return nil }
+        return (aiInsightsSessionCache.existingSession(for: message.id) as? MessageInsightsSession)?.assessment?.score
+    }
+
+    /// True once the feature is on and available, as long as there's no score yet and no
+    /// failure — covers both "the session hasn't been created yet" (it will be, momentarily,
+    /// once `AIInsightsView` appears below) and "it exists but the score is still generating",
+    /// so the summary block can show a spinner immediately rather than waiting for
+    /// `AIInsightsView` to mount first.
+    private var aiScoreIsPending: Bool {
+        guard settings.isAIInsightsEnabled else { return false }
+        guard #available(macOS 27, *) else { return false }
+        guard case .available = AIInsightsAvailability.current else { return false }
+        guard let session = aiInsightsSessionCache.existingSession(for: message.id) as? MessageInsightsSession else {
+            return true
+        }
+        if session.assessment != nil { return false }
+        if session.lastError != nil { return false }
+        return true
     }
 
     @FocusState private var focusedSection: ReportSection?
@@ -102,9 +133,12 @@ struct MessageDetailView: View {
                         authentication: authenticationAnalysis,
                         deliveryPath: deliveryPathAnalysis,
                         spamAssessment: spamAssessment,
+                        aiScore: aiLegitimacyScore,
+                        aiScoreIsPending: aiScoreIsPending,
                         onTapAuthentication: { scrollTo(.authentication, proxy: proxy) },
                         onTapHops: { scrollTo(.deliveryPath, proxy: proxy) },
-                        onTapSpam: { scrollTo(.spam, proxy: proxy) }
+                        onTapSpam: { scrollTo(.spam, proxy: proxy) },
+                        onTapAI: { scrollTo(.aiInsights, proxy: proxy) }
                     )
                     Divider()
                     AuthenticationView(analysis: authenticationAnalysis, spfRecheckTarget: spfRecheckTarget)
@@ -123,6 +157,26 @@ struct MessageDetailView: View {
                         .focusable()
                         .focused($focusedSection, equals: .deliveryPath)
                         .id(ReportSection.deliveryPath)
+                    if settings.isAIInsightsEnabled {
+                        Divider()
+                        Group {
+                            if #available(macOS 27, *) {
+                                AIInsightsView(
+                                    message: message,
+                                    authentication: authenticationAnalysis,
+                                    deliveryPath: deliveryPathAnalysis,
+                                    senderIdentityObservations: senderIdentityAnalysis.observations,
+                                    spamAssessment: spamAssessment,
+                                    allowIncludingMessageTextInChat: settings.allowIncludingMessageTextInAIChat
+                                )
+                            } else {
+                                AIInsightsUnavailableView(reason: "Requires macOS 27 or later.")
+                            }
+                        }
+                        .focusable()
+                        .focused($focusedSection, equals: .aiInsights)
+                        .id(ReportSection.aiInsights)
+                    }
                     if !additionalHeaders.isEmpty {
                         Divider()
                         AdditionalSecurityHeadersView(headers: additionalHeaders)

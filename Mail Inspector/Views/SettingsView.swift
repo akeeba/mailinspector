@@ -149,6 +149,26 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Analyze messages with Apple Intelligence", isOn: Binding(
+                    get: { settings.isAIInsightsEnabled },
+                    set: { settings.isAIInsightsEnabled = $0 }
+                ))
+                if settings.isAIInsightsEnabled {
+                    Toggle("Allow including message text in chat", isOn: Binding(
+                        get: { settings.allowIncludingMessageTextInAIChat },
+                        set: { settings.allowIncludingMessageTextInAIChat = $0 }
+                    ))
+                }
+            } header: {
+                Text("Apple Intelligence Analysis")
+            } footer: {
+                Text(settings.isAIInsightsEnabled
+                    ? "Requires macOS 27 and Apple Intelligence enabled on eligible hardware. Runs entirely on-device: a legitimacy score and a short analysis are generated once per message from the signals already shown elsewhere in this report (SPF/DKIM/DMARC, delivery path, spam score) — never the raw headers or message body — plus a chat for follow-up questions. It's a model's opinion, not a verdict; it can be confidently wrong. When \"Allow including message text in chat\" is on, a chat question can optionally attach a raw, undecoded excerpt of the message's own text — this app never otherwise decodes the body, and that excerpt can look like encoded gibberish for most real-world messages."
+                    : "Off disables the on-device legitimacy score, analysis, and chat throughout the report. Requires macOS 27 and Apple Intelligence; processing happens entirely on-device.")
+                    .font(.caption)
+            }
+
+            Section {
                 Picker("Page size", selection: Binding(
                     get: { settings.reportPageSize },
                     set: { settings.reportPageSize = $0 }
@@ -165,7 +185,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 1060)
+        .frame(width: 460, height: 1180)
     }
 
     private func addAuthServID() {

@@ -22,6 +22,8 @@ final class InspectorSettings {
     private static let showBrandImagesKey = "showBrandImages"
     private static let hideBrandImagesForMessagesWithoutSpamScoreKey = "hideBrandImagesForMessagesWithoutSpamScore"
     private static let hideBrandImagesAboveSpamThresholdKey = "hideBrandImagesAboveSpamThreshold"
+    private static let isAIInsightsEnabledKey = "isAIInsightsEnabled"
+    private static let allowIncludingMessageTextInAIChatKey = "allowIncludingMessageTextInAIChat"
 
     var maxMessageSizeBytes: Int = InspectorSettings.defaultMaxMessageSizeBytes
 
@@ -119,6 +121,29 @@ final class InspectorSettings {
         }
     }
 
+    /// Whether to analyze each message with Apple's on-device Apple Intelligence model (a
+    /// legitimacy score, a short prose analysis, and a follow-up chat), when it's available —
+    /// macOS 27+ with Apple Intelligence enabled on eligible hardware. On by default: all of
+    /// this runs entirely on-device, so unlike this app's one network-touching feature (brand
+    /// images), there's no remote request to be cautious about, just a result that — like any
+    /// model output — can be confidently wrong.
+    var isAIInsightsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isAIInsightsEnabled, forKey: Self.isAIInsightsEnabledKey)
+        }
+    }
+
+    /// Whether the Apple Intelligence chat is allowed to attach a decoded excerpt of the
+    /// message's own text content to a question, when the user explicitly asks it to. Off by
+    /// default: the body is otherwise never decoded anywhere in this app, the excerpt is raw
+    /// (not MIME-aware, so it can look like encoded gibberish for most real-world messages), and
+    /// attacker-controlled text is a real prompt-injection surface even when processed on-device.
+    var allowIncludingMessageTextInAIChat: Bool {
+        didSet {
+            UserDefaults.standard.set(allowIncludingMessageTextInAIChat, forKey: Self.allowIncludingMessageTextInAIChatKey)
+        }
+    }
+
     init() {
         trustedAuthServIDs = UserDefaults.standard.stringArray(forKey: Self.trustedAuthServIDsKey) ?? []
         trustAllAuthenticationResultsByDefault = UserDefaults.standard.object(forKey: Self.trustAllAuthenticationResultsByDefaultKey) as? Bool ?? true
@@ -130,5 +155,7 @@ final class InspectorSettings {
         showBrandImages = UserDefaults.standard.object(forKey: Self.showBrandImagesKey) as? Bool ?? false
         hideBrandImagesForMessagesWithoutSpamScore = UserDefaults.standard.object(forKey: Self.hideBrandImagesForMessagesWithoutSpamScoreKey) as? Bool ?? true
         hideBrandImagesAboveSpamThreshold = UserDefaults.standard.object(forKey: Self.hideBrandImagesAboveSpamThresholdKey) as? Double ?? 25
+        isAIInsightsEnabled = UserDefaults.standard.object(forKey: Self.isAIInsightsEnabledKey) as? Bool ?? true
+        allowIncludingMessageTextInAIChat = UserDefaults.standard.object(forKey: Self.allowIncludingMessageTextInAIChatKey) as? Bool ?? false
     }
 }

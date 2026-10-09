@@ -7,6 +7,16 @@
 
 import SwiftUI
 
+/// The Apple Intelligence score and prose analysis for one message, already generated while it
+/// was open in the detail view — plain, always-available types only, since `MessageInsightsSession`
+/// itself requires macOS 27 and this needs to flow through export code that doesn't. The chat
+/// transcript is deliberately excluded: it's a conversation, not a fact to report.
+struct AIInsightsExportSummary {
+    let score: Int
+    let rationale: String
+    let analysisText: String
+}
+
 /// A static, non-interactive rendering of a message's full analysis, built specifically for
 /// PDF export/sharing (via `ReportPDFExporter`) rather than on-screen reading. Unlike
 /// `MessageDetailView`, nothing here is collapsed, searchable, or clickable — a PDF has no
@@ -26,6 +36,7 @@ struct ReportExportView: View {
 
     let message: EmailMessage
     let settings: InspectorSettings
+    var aiInsights: AIInsightsExportSummary? = nil
 
     private var senderIdentityAnalysis: SenderIdentityAnalysis {
         SenderIdentityAnalyzer.analyze(message: message)
@@ -98,6 +109,11 @@ struct ReportExportView: View {
         if let spamAssessment {
             items.append(AnyView(sectionHeading("Spam Likelihood")))
             items.append(AnyView(spamBlock(spamAssessment)))
+        }
+
+        if let aiInsights {
+            items.append(AnyView(sectionHeading("Apple Intelligence Analysis (AI-generated — verify independently)")))
+            items.append(AnyView(aiInsightsBlock(aiInsights)))
         }
 
         if !combinedObservations.isEmpty {
@@ -232,6 +248,15 @@ struct ReportExportView: View {
 
     private func spamBlock(_ assessment: SpamLikelihoodAssessment) -> some View {
         staticLine("\(assessment.qualitativeLabel) (\(Int(assessment.percentage.rounded()))%) — as reported by \(assessment.sourceHeaderName) (\(assessment.rawValue)). This reflects the mail provider's own filter, not an independent assessment.")
+    }
+
+    private func aiInsightsBlock(_ summary: AIInsightsExportSummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Legitimacy score: \(summary.score)%").font(.subheadline.weight(.semibold))
+            staticLine(summary.rationale)
+            staticLine(summary.analysisText)
+            staticLine("Generated on-device by Apple Intelligence from this report's own signals — an AI opinion, not a verdict, and it can be confidently wrong.")
+        }
     }
 
     private func observationBlock(_ observation: SecurityObservation) -> some View {

@@ -15,9 +15,15 @@ struct SummaryBlocksView: View {
     let authentication: AuthenticationAnalysis
     let deliveryPath: DeliveryPathAnalysis
     let spamAssessment: SpamLikelihoodAssessment?
+    let aiScore: Int?
+    /// True while the score itself is still being generated (not the longer prose analysis) —
+    /// shows a spinner in the AI block's place rather than waiting for a score to exist before
+    /// the block appears at all.
+    let aiScoreIsPending: Bool
     let onTapAuthentication: () -> Void
     let onTapHops: () -> Void
     let onTapSpam: () -> Void
+    let onTapAI: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -58,6 +64,24 @@ struct SummaryBlocksView: View {
                     action: onTapSpam
                 )
             }
+            if let aiScore {
+                SummaryBlock(
+                    title: "AI",
+                    value: "\(aiScore)%",
+                    systemImage: "sparkles",
+                    tintColor: aiTintColor(for: aiScore),
+                    action: onTapAI
+                )
+            } else if aiScoreIsPending {
+                SummaryBlock(
+                    title: "AI",
+                    value: "",
+                    systemImage: "sparkles",
+                    tintColor: .secondary,
+                    isLoading: true,
+                    action: onTapAI
+                )
+            }
         }
     }
 
@@ -75,6 +99,15 @@ struct SummaryBlocksView: View {
         default: return .red
         }
     }
+
+    /// Inverted from `spamTintColor`: high is good here (a legitimacy score), not bad.
+    private func aiTintColor(for score: Int) -> Color {
+        switch score {
+        case ..<33: return .red
+        case ..<66: return .orange
+        default: return .green
+        }
+    }
 }
 
 private struct SummaryBlock: View {
@@ -82,6 +115,7 @@ private struct SummaryBlock: View {
     let value: String
     let systemImage: String?
     let tintColor: Color
+    var isLoading: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -90,15 +124,20 @@ private struct SummaryBlock: View {
                 Text(title)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                if let systemImage {
-                    Image(systemName: systemImage)
-                        .font(.title3)
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    if let systemImage {
+                        Image(systemName: systemImage)
+                            .font(.title3)
+                            .foregroundStyle(tintColor)
+                    }
+                    Text(value)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(tintColor)
+                        .lineLimit(1)
                 }
-                Text(value)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(tintColor)
-                    .lineLimit(1)
             }
             .frame(minWidth: 88, minHeight: 72)
             .padding(10)
@@ -106,7 +145,7 @@ private struct SummaryBlock: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title): \(value)")
+        .accessibilityLabel(isLoading ? "\(title): generating" : "\(title): \(value)")
         .accessibilityHint("Jumps to the \(title) section of the report.")
     }
 }

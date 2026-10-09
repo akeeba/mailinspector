@@ -13,6 +13,7 @@ struct MailInspectorApp: App {
     @State private var settings = InspectorSettings()
     @State private var fileOpenRequest = FileOpenRequest()
     @State private var reportExportRequest = ReportExportRequest()
+    @State private var aiInsightsSessionCache = AIInsightsSessionCache()
 
     var body: some Scene {
         WindowGroup {
@@ -21,6 +22,7 @@ struct MailInspectorApp: App {
                 .environment(appDelegate.pendingImports)
                 .environment(fileOpenRequest)
                 .environment(reportExportRequest)
+                .environment(aiInsightsSessionCache)
         }
         .commands {
             CommandGroup(replacing: .newItem) {
