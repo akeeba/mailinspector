@@ -67,7 +67,7 @@ struct ContentView: View {
         } detail: {
             Group {
                 if let selection, let message = messages.first(where: { $0.id == selection }) {
-                    MessageDetailView(message: message)
+                    MessageDetailView(message: message, onDelete: { remove(message.id) })
                 } else if messages.isEmpty {
                     DropZoneView(onImportURLs: { importItems($0.map { DroppedItem(url: $0, isTemporary: false) }) }, onOpenFile: { isImporterPresented = true })
                 } else {
