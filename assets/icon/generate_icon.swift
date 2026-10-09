@@ -1,7 +1,7 @@
 //
 //  Mail Inspector
 //
-//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos / Akeeba Ltd
 //  Licensed under the MIT License. See license.txt in the project root for details.
 //
 //  Regenerates the app icon PNGs for Mail Inspector/Assets.xcassets/AppIcon.appiconset.

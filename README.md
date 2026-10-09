@@ -5,41 +5,95 @@ Inspect the legitimacy of the emails you receive in Apple Mail on macOS
 ## Overview
 
 Mail Inspector is a native macOS app for inspecting potentially malicious email without opening
-it in Apple Mail. Drop an `.eml` file, open it from Finder, or drag a message onto the Dock icon,
-and Mail Inspector parses the raw RFC 5322 source and shows you:
+it in Apple Mail. Drop an `.eml` or `.emlx` file, open one or more from Finder, or drag a message
+onto the Dock icon, and Mail Inspector parses the raw RFC 5322 source and builds a report with the
+sections below.
 
-- **Sender identity** — the actual `From` address and display name, with discrepancies
-  (forged display names, Reply-To/Return-Path mismatches, IDN/Punycode domains, mixed-script
-  display names) surfaced as observations, not accusations.
+Mail Inspector never renders HTML, never executes scripts or attachments, and never follows links.
+Message content is never logged or persisted beyond what you explicitly import.
+
+## Report sections
+
+- **Noteworthy Observations** (off by default) — an optional summary at the top of the report,
+  gathering every flagged finding from the sections below into one list. Severity labels and
+  plain descriptions only, deliberately not a single score, so you form your own judgment rather
+  than anchoring on one number.
+- **Sender identity** — the actual `From` address and display name, with discrepancies (forged
+  display names, Reply-To/Return-Path mismatches, IDN/Punycode domains, mixed-script display
+  names) surfaced as observations, not accusations. A Reply-To mismatch you've reviewed can be
+  marked safe for that sender from right there in the report, so it stops being flagged. Can
+  optionally show the sender domain's published BIMI brand logo, but only once DMARC is a trusted
+  pass (and, optionally, only above/below a spam-score threshold you set).
 - **Authentication** — SPF, DKIM, and DMARC results parsed from `Authentication-Results` and
-  `DKIM-Signature` headers, with an explicit trust model: a result is only shown as trusted when
-  it comes from an `authserv-id` you've configured (or, by default, treated as trusted outright —
-  configurable in Settings). An optional, manually-triggered SPF recheck can re-run the check
-  against the record as it exists *right now* via a real DNS lookup — the only other network
-  request this app makes besides a weekly Public Suffix List refresh used for domain-alignment
-  comparisons.
+  `DKIM-Signature` headers (including full DKIM signature detail: algorithm, canonicalization,
+  signed headers, selector, signing identity, timestamps), with an explicit trust model: a result
+  is only shown as trusted when it comes from an `authserv-id` you've configured (or, by default,
+  treated as trusted outright — configurable in Settings). DMARC domain-alignment (strict/relaxed)
+  is shown for both SPF and DKIM. An optional, manually-triggered SPF recheck can re-run the check
+  against the record as it exists *right now* via a real DNS lookup — one of only two network
+  requests this app ever makes.
+- **Spam Likelihood** (off by default) — a gauge built from a spam-scoring header your mail
+  provider's filter already added (`X-Spam-Score`, Exchange's Spam Confidence Level, Rspamd,
+  mailbox.org, etc.), rescaled for display. Never an independent assessment — the report always
+  says so.
 - **Delivery path** — a reconstructed, chronological timeline from every `Received` header, with
-  IP-scope classification (private/loopback/reserved), reverse-DNS hostname mismatches, and
-  chronological/timing anomalies flagged — all without treating anything outside your own trusted
-  infrastructure as proof of wrongdoing.
-- **Raw headers** — a searchable, monospaced, read-only view of the complete original headers.
+  IP-scope classification (private/loopback/reserved), reverse-DNS hostname mismatches, TLS
+  version/cipher per hop, and chronological/timing anomalies flagged — all without treating
+  anything outside your own trusted infrastructure as proof of wrongdoing. A hostname mismatch you've
+  reviewed can likewise be marked safe for that specific claimed/verified pair.
+- **AI Message Analysis** (off by default) — a 0-100 legitimacy gauge, a short prose analysis, and
+  a follow-up chat, generated from the signals already shown elsewhere in the report (SPF/DKIM/
+  DMARC, delivery path, spam score) — never the raw headers or message body, unless you explicitly
+  opt in to attaching a text excerpt to a specific chat question. Runs either fully on-device via
+  Apple Intelligence (macOS 27+, eligible hardware, zero configuration, nothing ever leaves the
+  Mac) or against a remote provider you configure: LM Studio or another local OpenAI-compatible
+  server, and a catalogue of hosted providers (OpenAI, Anthropic, Google, Mistral, Cohere,
+  DeepSeek, Groq, MiniMax, OpenRouter, Perplexity, Scaleway, GitHub Models), plus a fully custom
+  OpenAI-compatible endpoint. API keys are stored in the Keychain, never in plain settings. It's a
+  model's opinion, not a verdict — it can be confidently wrong.
+- **Additional Filtering Headers** — known chain-of-custody and anti-spam headers this app doesn't
+  otherwise parse structurally (ARC-*, Received-SPF, X-Spam-*, Microsoft 365/Exchange anti-spam
+  headers, Rspamd, mailbox.org), shown as-is with a plain-language explanation of what each means.
+  Never reimplements any filter's scoring logic.
+- **Raw headers** — a searchable, monospaced, read-only view of the complete original headers,
+  with one-click copy of a single header or the entire header block.
+
+## Report export
+
+A message's report can be exported or shared as a paginated PDF (⌘E to save, ⇧⌘E to share via the
+system share sheet — Mail, Messages, AirDrop, Save to Files, …), at a page size you choose (US
+Letter, US Legal, A4, or A5) in Settings. If the AI analysis has already been generated for that
+message, its score and analysis are included in the export.
+
+## Settings
+
+- Trust configuration: which `authserv-id`s to trust for Authentication-Results (or trust all by
+  default), plus the Reply-To-domain and delivery-hop-hostname exceptions you've marked safe from
+  the report itself.
+- Import limit: maximum accepted message size, checked before and after reading untrusted input.
+- Domain alignment data: whether to keep a weekly-refreshed copy of the public suffix list (used
+  to tell a subdomain apart from an unrelated domain for DMARC alignment) up to date — the only
+  other network request this app ever makes, besides the manual SPF recheck above. Off by default
+  falls back to a small bundled list.
+- Noteworthy Observations, Spam Filtering, Brand Images (BIMI), and AI Message Analysis: each
+  toggled independently, all off by default except where noted above.
+- Report export page size.
 
 > [!IMPORTANT]
 > You cannot drag a mail directly onto the app window. This is a limitation of macOS and Mail.app.
 > When dragging an email onto an application, Mail.app only includes a message ID to create a deep
 > link which opens the mail in Mail.app. It does not send the mail content itself, let alone the
-> mail headers we actually need to analyse. When you are dragging an email onto an app'sDock icon,
+> mail headers we actually need to analyse. When you are dragging an email onto an app's Dock icon,
 > though, it sends the entire email message – and that's why that drag and drop operation works.
 > Yes, it is annoying and inconsistent. That's how Apple designed it. I can only work with what
 > Apple gives me to work with, folks.
-
-Mail Inspector never renders HTML, never executes scripts or attachments, and never follows links.
-Message content is never logged or persisted beyond what you explicitly import.
 
 ## Requirements
 
 - macOS (latest SDK), Swift 6, SwiftUI + AppKit.
 - No third-party dependencies.
+- AI Message Analysis's on-device option requires macOS 27+ with Apple Intelligence enabled on
+  eligible hardware; every other feature works without it.
 
 ## Building
 
@@ -50,4 +104,4 @@ Open `mailinspector.xcodeproj` in Xcode and build the `Mail Inspector` scheme.
 Mail Inspector is released under the MIT License. See [license.txt](license.txt) for the full
 text.
 
-Copyright (c) 2026 Nicholas K. Dionysopoulos.
+Copyright (c) 2026 Nicholas K. Dionysopoulos / Akeeba Ltd.

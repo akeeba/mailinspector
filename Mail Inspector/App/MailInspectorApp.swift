@@ -1,7 +1,7 @@
 //
 //  Mail Inspector
 //
-//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos / Akeeba Ltd
 //  Licensed under the MIT License. See license.txt in the project root for details.
 //
 
@@ -25,6 +25,11 @@ struct MailInspectorApp: App {
                 .environment(aiInsightsSessionCache)
         }
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Mail Inspector") {
+                    AboutPanel.show()
+                }
+            }
             CommandGroup(replacing: .newItem) {
                 Button("Open Email File…") {
                     fileOpenRequest.fire()
