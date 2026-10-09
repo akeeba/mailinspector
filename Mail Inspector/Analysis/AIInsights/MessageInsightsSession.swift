@@ -6,44 +6,31 @@
 //
 
 import Foundation
-import FoundationModels
 import Observation
 
-/// Two on-device `LanguageModelSession`s per message: a throwaway one used *only* for the single
-/// structured-score call, and a long-lived one — reused for the prefab prose analysis and every
-/// follow-up chat turn — that never sees that structured exchange at all.
-///
-/// They're kept separate on purpose. The first implementation used one shared session for the
-/// score, the prose analysis, and chat, on the theory that a shared conversation lets follow-up
-/// questions refer back to "the score" without re-explaining it. In practice, once the model had
-/// produced one JSON-shaped reply (the `@Generable` score response) earlier in a session's own
-/// transcript, it would sometimes imitate that format in later plain-text chat replies — a real,
-/// user-reported bug, not a hypothetical one: asking "Does the message text sound AI-generated?"
-/// came back as a raw JSON blob instead of prose. Keeping the structured call in its own
-/// single-use session means the long-lived session's transcript is 100% natural language from
-/// its very first turn, which removes the thing the model was imitating. The score and rationale
-/// are still threaded into that first turn as plain English, so chat can still refer back to them.
-///
-/// Requires macOS 27, not 26: `LanguageModelError` (needed to describe failures) is only
-/// available starting macOS 27 on this SDK, even though `LanguageModelSession`/`Generable`
-/// themselves are available from macOS 26 — confirmed by the compiler, not documentation, so
-/// the whole feature is gated at the stricter of the two to avoid partial-availability code.
-@available(macOS 27, *)
+/// Coordinates one message's AI analysis — the automatic score, the prefab prose analysis, and
+/// the follow-up chat — on top of whichever `AIAnalysisEngine` is active. Holds no backend-
+/// specific state itself and carries no `@available` annotation: that's entirely delegated to
+/// the engine, which is why this type, `AIInsightsSessionCache`, and most of the SwiftUI call
+/// sites around it no longer need to know macOS 27 (or any particular provider) is involved.
+/// Looked up/created through `AIInsightsSessionCache` so it survives switching between messages
+/// and back.
 @MainActor
 @Observable
 final class MessageInsightsSession {
-    nonisolated enum ChatRole: Sendable {
-        case user
-        case assistant
-    }
-
     nonisolated struct ChatMessage: Identifiable, Sendable {
-        let id = UUID()
+        let id: UUID
         let role: ChatRole
-        let text: String
+        var text: String
+
+        init(id: UUID = UUID(), role: ChatRole, text: String) {
+            self.id = id
+            self.role = role
+            self.text = text
+        }
     }
 
-    private(set) var assessment: MessageLegitimacyAssessment?
+    private(set) var assessment: AIScoreResult?
     private(set) var prefabAnalysis: String?
     private(set) var chatMessages: [ChatMessage] = []
     /// True only while the score itself is being generated — the first, usually-quicker of the
@@ -59,18 +46,16 @@ final class MessageInsightsSession {
     /// Either step of the initial analysis is still running.
     var isRunningInitialAnalysis: Bool { isGeneratingScore || isGeneratingAnalysis }
 
-    /// The long-lived session: its first turn is the prefab analysis, every chat turn after
-    /// that continues it. Never used for the structured score call — see the type-level comment.
-    private let chatSession: LanguageModelSession
+    private let engine: any AIAnalysisEngine
     private let signalsSummary: String
     private var hasRunInitialAnalysis = false
 
-    init(signalsSummary: String) {
+    init(engine: any AIAnalysisEngine, signalsSummary: String) {
+        self.engine = engine
         self.signalsSummary = signalsSummary
-        self.chatSession = LanguageModelSession(instructions: Self.instructions)
     }
 
-    private static let instructions = """
+    static let instructions = """
         You are a careful, skeptical email-security assistant helping someone judge whether an \
         email message is legitimate or a forgery/phishing attempt. You are given a short digest \
         of signals this app already computed from the message's headers — SPF/DKIM/DMARC \
@@ -91,13 +76,8 @@ final class MessageInsightsSession {
 
         isGeneratingScore = true
         do {
-            // A throwaway session, deliberately never reused for chat — see the type-level
-            // comment for why mixing a structured-output exchange into the chat transcript
-            // caused the model to imitate JSON in later plain-text replies.
-            let scoringSession = LanguageModelSession(instructions: Self.instructions)
-            let scorePrompt = "Here is the computed signal digest for this email:\n\n\(signalsSummary)\n\nAssess how legitimate this message is."
-            let scoreResponse = try await scoringSession.respond(to: scorePrompt, generating: MessageLegitimacyAssessment.self)
-            assessment = scoreResponse.content
+            let scoreResult = try await engine.generateScore(signalsSummary: signalsSummary)
+            assessment = scoreResult
             isGeneratingScore = false
 
             isGeneratingAnalysis = true
@@ -106,12 +86,13 @@ final class MessageInsightsSession {
 
                 \(signalsSummary)
 
-                A separate analysis already assessed this message's legitimacy at \(scoreResponse.content.score) out of 100, with this rationale: "\(scoreResponse.content.rationale)"
+                A separate analysis already assessed this message's legitimacy at \(scoreResult.score) out of 100, with this rationale: "\(scoreResult.rationale)"
 
                 Explain that assessment in a short paragraph (3-5 sentences) a non-technical person could follow, calling out the most important signal(s) it's based on.
                 """
-            let analysisResponse = try await chatSession.respond(to: analysisPrompt)
-            prefabAnalysis = analysisResponse.content
+            for try await snapshot in engine.streamRespond(prompt: analysisPrompt) {
+                prefabAnalysis = snapshot
+            }
             isGeneratingAnalysis = false
         } catch {
             lastError = Self.describeError(error)
@@ -143,35 +124,21 @@ final class MessageInsightsSession {
                 """
         }
 
+        let assistantIndex = chatMessages.count
+        chatMessages.append(ChatMessage(role: .assistant, text: ""))
+
         do {
-            let response = try await chatSession.respond(to: prompt)
-            chatMessages.append(ChatMessage(role: .assistant, text: response.content))
+            for try await snapshot in engine.streamRespond(prompt: prompt) {
+                chatMessages[assistantIndex].text = snapshot
+            }
         } catch {
             let message = Self.describeError(error)
             lastError = message
-            chatMessages.append(ChatMessage(role: .assistant, text: "⚠️ \(message)"))
+            chatMessages[assistantIndex].text = "⚠️ \(message)"
         }
     }
 
     private static func describeError(_ error: Error) -> String {
-        guard let error = error as? LanguageModelError else {
-            return "Something went wrong talking to Apple Intelligence."
-        }
-        switch error {
-        case .guardrailViolation:
-            return "Apple Intelligence's safety system blocked this request."
-        case .refusal:
-            return "The model declined to respond to this."
-        case .contextSizeExceeded:
-            return "This conversation has grown too long for the model to continue. Try asking a shorter question, or re-open the message to start fresh."
-        case .rateLimited:
-            return "Apple Intelligence is temporarily rate-limiting requests. Try again in a moment."
-        case .unsupportedLanguageOrLocale:
-            return "This content uses a language Apple Intelligence doesn't support here."
-        case .timeout:
-            return "Apple Intelligence took too long to respond."
-        default:
-            return "Apple Intelligence couldn't complete this request."
-        }
+        (error as? AIEngineError)?.message ?? "Something went wrong talking to the AI backend."
     }
 }

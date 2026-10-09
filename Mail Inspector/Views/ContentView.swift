@@ -225,8 +225,7 @@ struct ContentView: View {
     /// never opened in the detail view simply exports without this section.
     private func aiExportSummary(for message: EmailMessage) -> AIInsightsExportSummary? {
         guard settings.isAIInsightsEnabled else { return nil }
-        guard #available(macOS 27, *) else { return nil }
-        guard let session = aiInsightsSessionCache.existingSession(for: message.id) as? MessageInsightsSession,
+        guard let session = aiInsightsSessionCache.existingSession(for: message.id),
               let assessment = session.assessment,
               let analysisText = session.prefabAnalysis else {
             return nil

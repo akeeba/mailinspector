@@ -84,9 +84,8 @@ struct MessageDetailView: View {
     /// `@Observable` session, however it was obtained.
     private var aiLegitimacyScore: Int? {
         guard settings.isAIInsightsEnabled else { return nil }
-        guard #available(macOS 27, *) else { return nil }
         guard case .available = AIInsightsAvailability.current else { return nil }
-        return (aiInsightsSessionCache.existingSession(for: message.id) as? MessageInsightsSession)?.assessment?.score
+        return aiInsightsSessionCache.existingSession(for: message.id)?.assessment?.score
     }
 
     /// True once the feature is on and available, as long as there's no score yet and no
@@ -96,9 +95,8 @@ struct MessageDetailView: View {
     /// `AIInsightsView` to mount first.
     private var aiScoreIsPending: Bool {
         guard settings.isAIInsightsEnabled else { return false }
-        guard #available(macOS 27, *) else { return false }
         guard case .available = AIInsightsAvailability.current else { return false }
-        guard let session = aiInsightsSessionCache.existingSession(for: message.id) as? MessageInsightsSession else {
+        guard let session = aiInsightsSessionCache.existingSession(for: message.id) else {
             return true
         }
         if session.assessment != nil { return false }
@@ -159,20 +157,14 @@ struct MessageDetailView: View {
                         .id(ReportSection.deliveryPath)
                     if settings.isAIInsightsEnabled {
                         Divider()
-                        Group {
-                            if #available(macOS 27, *) {
-                                AIInsightsView(
-                                    message: message,
-                                    authentication: authenticationAnalysis,
-                                    deliveryPath: deliveryPathAnalysis,
-                                    senderIdentityObservations: senderIdentityAnalysis.observations,
-                                    spamAssessment: spamAssessment,
-                                    allowIncludingMessageTextInChat: settings.allowIncludingMessageTextInAIChat
-                                )
-                            } else {
-                                AIInsightsUnavailableView(reason: "Requires macOS 27 or later.")
-                            }
-                        }
+                        AIInsightsView(
+                            message: message,
+                            authentication: authenticationAnalysis,
+                            deliveryPath: deliveryPathAnalysis,
+                            senderIdentityObservations: senderIdentityAnalysis.observations,
+                            spamAssessment: spamAssessment,
+                            allowIncludingMessageTextInChat: settings.allowIncludingMessageTextInAIChat
+                        )
                         .focusable()
                         .focused($focusedSection, equals: .aiInsights)
                         .id(ReportSection.aiInsights)

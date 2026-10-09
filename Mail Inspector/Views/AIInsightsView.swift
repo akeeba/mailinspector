@@ -7,11 +7,12 @@
 
 import SwiftUI
 
-/// The Apple Intelligence section: an automatic 0-100 legitimacy gauge and short prose analysis
-/// (both computed once per message, from `EmailSignalsSummary`'s signal digest only — never the
-/// raw headers or body), plus a follow-up chat that reuses the same on-device session so it can
-/// refer back to the score and the analysis without re-explaining them.
-@available(macOS 27, *)
+/// The AI analysis section: an automatic 0-100 legitimacy gauge and short prose analysis (both
+/// computed once per message, from `EmailSignalsSummary`'s signal digest only — never the raw
+/// headers or body), plus a follow-up chat that reuses the same backend session so it can refer
+/// back to the score and the analysis without re-explaining them. Carries no `@available`
+/// annotation — which backend is active, and whether it's available right now, is entirely
+/// `AIEngineFactory`'s concern.
 struct AIInsightsView: View {
     let message: EmailMessage
     let authentication: AuthenticationAnalysis
@@ -26,7 +27,15 @@ struct AIInsightsView: View {
 
     /// Looked up (or created, on first access) through the shared cache, keyed by message id —
     /// this is what makes the score/analysis/chat survive switching to another message and back.
-    private var session: MessageInsightsSession {
+    /// `nil` only when no backend is currently usable (e.g. Apple Intelligence not enabled, no
+    /// other provider configured).
+    private var session: MessageInsightsSession? {
+        if let existing = sessionCache.existingSession(for: message.id) {
+            return existing
+        }
+        guard let engine = AIEngineFactory.makeActiveEngine(systemPrompt: MessageInsightsSession.instructions) else {
+            return nil
+        }
         let summary = EmailSignalsSummary.build(
             message: message,
             authentication: authentication,
@@ -34,12 +43,14 @@ struct AIInsightsView: View {
             senderIdentityObservations: senderIdentityObservations,
             spamAssessment: spamAssessment
         )
-        let object = sessionCache.getOrCreateSession(for: message.id) {
-            MessageInsightsSession(signalsSummary: summary)
+        return sessionCache.getOrCreateSession(for: message.id) {
+            MessageInsightsSession(engine: engine, signalsSummary: summary)
         }
-        // Invariant: only this view ever stores a session under a message id, and it always
-        // stores a `MessageInsightsSession`.
-        return object as! MessageInsightsSession
+    }
+
+    private var unavailableReason: String {
+        if case .unavailable(let reason) = AIInsightsAvailability.current { return reason }
+        return "No AI backend is currently available."
     }
 
     var body: some View {
@@ -47,22 +58,19 @@ struct AIInsightsView: View {
             Text("Apple Intelligence Analysis")
                 .font(.headline)
 
-            switch AIInsightsAvailability.current {
-            case .unavailable(let reason):
-                AIInsightsUnavailableView(reason: reason)
-            case .available:
-                content
+            if let session {
+                content(session: session)
+            } else {
+                AIInsightsUnavailableView(reason: unavailableReason)
             }
         }
         .task(id: message.id) {
-            guard AIInsightsAvailability.current == .available else { return }
-            await session.runInitialAnalysisIfNeeded()
+            await session?.runInitialAnalysisIfNeeded()
         }
     }
 
     @ViewBuilder
-    private var content: some View {
-        let session = session
+    private func content(session: MessageInsightsSession) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if session.isRunningInitialAnalysis {
                 HStack(spacing: 8) {
@@ -178,7 +186,6 @@ struct AIInsightsView: View {
     }
 }
 
-@available(macOS 27, *)
 private struct ChatBubble: View {
     let message: MessageInsightsSession.ChatMessage
 
@@ -198,10 +205,8 @@ private struct ChatBubble: View {
     }
 }
 
-/// Shown whenever Apple Intelligence isn't available — unsupported OS, not enabled, ineligible
-/// hardware, or the model still downloading. Carries no `@available` annotation (unlike the rest
-/// of this file) so `MessageDetailView` can also show it directly on macOS versions below the
-/// feature's actual floor, where `AIInsightsView` itself can't even be referenced.
+/// Shown whenever no AI backend is currently usable — unsupported OS, Apple Intelligence not
+/// enabled, ineligible hardware, or the model still downloading.
 struct AIInsightsUnavailableView: View {
     let reason: String
 
