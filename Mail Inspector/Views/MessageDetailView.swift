@@ -87,7 +87,14 @@ struct MessageDetailView: View {
                             .focused($focusedSection, equals: .observations)
                             .id(ReportSection.observations)
                     }
-                    SenderIdentityView(message: message)
+                    SenderIdentityView(
+                        message: message,
+                        dmarcVerdict: authenticationAnalysis.dmarc.verdict,
+                        spamAssessment: spamAssessment,
+                        brandImagesEnabled: settings.showBrandImages,
+                        hideBrandImagesForMessagesWithoutSpamScore: settings.hideBrandImagesForMessagesWithoutSpamScore,
+                        hideBrandImagesAboveSpamThreshold: settings.hideBrandImagesAboveSpamThreshold
+                    )
                         .focusable()
                         .focused($focusedSection, equals: .senderIdentity)
                         .id(ReportSection.senderIdentity)

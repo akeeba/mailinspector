@@ -19,6 +19,9 @@ final class InspectorSettings {
     private static let trustServerSpamHeadersKey = "trustServerSpamHeaders"
     private static let isObservationsSummaryEnabledKey = "isObservationsSummaryEnabled"
     private static let reportPageSizeKey = "reportPageSize"
+    private static let showBrandImagesKey = "showBrandImages"
+    private static let hideBrandImagesForMessagesWithoutSpamScoreKey = "hideBrandImagesForMessagesWithoutSpamScore"
+    private static let hideBrandImagesAboveSpamThresholdKey = "hideBrandImagesAboveSpamThreshold"
 
     var maxMessageSizeBytes: Int = InspectorSettings.defaultMaxMessageSizeBytes
 
@@ -82,6 +85,40 @@ final class InspectorSettings {
         }
     }
 
+    /// Whether to look up and display a sender's BIMI (Brand Indicators for Message
+    /// Identification) logo next to their identity, when DMARC is a trusted pass. Off by
+    /// default: this is the one feature in the app that renders an image fetched from a
+    /// remote, sender-controlled URL — a malicious or compromised logo host could use it as an
+    /// attack vector against an unpatched vulnerability in macOS's image-decoding pipeline, the
+    /// same risk class as opening an image attachment from an untrusted sender. Decoding uses
+    /// the system's own `NSImage`, not some separate, sandboxed decoder, so that risk is real,
+    /// not theoretical.
+    var showBrandImages: Bool {
+        didSet {
+            UserDefaults.standard.set(showBrandImages, forKey: Self.showBrandImagesKey)
+        }
+    }
+
+    /// When `showBrandImages` is on: whether to suppress the brand image for a message with no
+    /// available spam score at all (either because `trustServerSpamHeaders` is off, or because
+    /// this particular message has no recognized spam-scoring header). On by default — no score
+    /// to compare against a threshold is itself a reason for caution before fetching a remote
+    /// image tied to an unscored message.
+    var hideBrandImagesForMessagesWithoutSpamScore: Bool {
+        didSet {
+            UserDefaults.standard.set(hideBrandImagesForMessagesWithoutSpamScore, forKey: Self.hideBrandImagesForMessagesWithoutSpamScoreKey)
+        }
+    }
+
+    /// When `showBrandImages` is on: suppresses the brand image once a message's spam-likelihood
+    /// percentage exceeds this threshold (0–100). Only consulted when a spam score is actually
+    /// available — see `hideBrandImagesForMessagesWithoutSpamScore` for the no-score case.
+    var hideBrandImagesAboveSpamThreshold: Double {
+        didSet {
+            UserDefaults.standard.set(hideBrandImagesAboveSpamThreshold, forKey: Self.hideBrandImagesAboveSpamThresholdKey)
+        }
+    }
+
     init() {
         trustedAuthServIDs = UserDefaults.standard.stringArray(forKey: Self.trustedAuthServIDsKey) ?? []
         trustAllAuthenticationResultsByDefault = UserDefaults.standard.object(forKey: Self.trustAllAuthenticationResultsByDefaultKey) as? Bool ?? true
@@ -90,5 +127,8 @@ final class InspectorSettings {
         isObservationsSummaryEnabled = UserDefaults.standard.object(forKey: Self.isObservationsSummaryEnabledKey) as? Bool ?? false
         reportPageSize = UserDefaults.standard.string(forKey: Self.reportPageSizeKey)
             .flatMap(ReportPageSize.init(rawValue:)) ?? .usLetter
+        showBrandImages = UserDefaults.standard.object(forKey: Self.showBrandImagesKey) as? Bool ?? false
+        hideBrandImagesForMessagesWithoutSpamScore = UserDefaults.standard.object(forKey: Self.hideBrandImagesForMessagesWithoutSpamScoreKey) as? Bool ?? true
+        hideBrandImagesAboveSpamThreshold = UserDefaults.standard.object(forKey: Self.hideBrandImagesAboveSpamThresholdKey) as? Double ?? 25
     }
 }

@@ -11,6 +11,24 @@ import AppKit
 /// Section A: sender identity, as asserted by the message itself (no authentication claims).
 struct SenderIdentityView: View {
     let message: EmailMessage
+    var dmarcVerdict: AuthenticationVerdict = .unknown
+    var spamAssessment: SpamLikelihoodAssessment? = nil
+    var brandImagesEnabled: Bool = false
+    var hideBrandImagesForMessagesWithoutSpamScore: Bool = true
+    var hideBrandImagesAboveSpamThreshold: Double = 25
+
+    @State private var brandImage: NSImage?
+
+    private var shouldShowBrandImage: Bool {
+        guard let domain = message.primaryFrom?.domain, !domain.isEmpty else { return false }
+        return BrandImagePolicy.shouldAttempt(
+            dmarcVerdict: dmarcVerdict,
+            spamAssessment: spamAssessment,
+            isEnabled: brandImagesEnabled,
+            hideWithoutSpamScore: hideBrandImagesForMessagesWithoutSpamScore,
+            hideAboveSpamThreshold: hideBrandImagesAboveSpamThreshold
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -18,22 +36,27 @@ struct SenderIdentityView: View {
                 .font(.headline)
 
             if let from = message.primaryFrom {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let displayName = from.displayName, !displayName.isEmpty {
-                        Text(displayName)
-                            .font(.title3)
+                HStack(alignment: .top, spacing: (shouldShowBrandImage && brandImage != nil) ? 10 : 0) {
+                    if shouldShowBrandImage {
+                        BrandImageView(domain: from.domain, image: $brandImage)
                     }
-                    HStack {
-                        Text(from.address)
-                            .font(.system(.body, design: .monospaced))
-                            .textSelection(.enabled)
-                        Button {
-                            copy(from.address)
-                        } label: {
-                            Image(systemName: "doc.on.doc")
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let displayName = from.displayName, !displayName.isEmpty {
+                            Text(displayName)
+                                .font(.title3)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Copy sender address")
+                        HStack {
+                            Text(from.address)
+                                .font(.system(.body, design: .monospaced))
+                                .textSelection(.enabled)
+                            Button {
+                                copy(from.address)
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Copy sender address")
+                        }
                     }
                 }
             } else {
@@ -98,5 +121,36 @@ struct SenderIdentityView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
+    }
+}
+
+/// Looks up and displays a sender domain's BIMI logo. Only ever instantiated once
+/// `BrandImagePolicy.shouldAttempt` has already approved it — this view itself does no gating,
+/// it just performs the lookup/fetch/decode and renders whatever comes back. Most domains have
+/// no BIMI record at all, so `image` reports back through a binding rather than owning its own
+/// state: that lets the parent collapse the space (and its leading spacing) it reserves for the
+/// logo entirely, instead of leaving a permanent blank box wherever a lookup finds nothing.
+private struct BrandImageView: View {
+    let domain: String
+    @Binding var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .task(id: domain) {
+            image = nil
+            guard let record = await BrandImageResolver.lookupRecord(domain: domain),
+                  let data = await BrandImageResolver.fetchImageData(at: record.logoURL) else {
+                return
+            }
+            image = NSImage(data: data)
+        }
     }
 }

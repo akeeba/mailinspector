@@ -123,6 +123,32 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Show brand images", isOn: Binding(
+                    get: { settings.showBrandImages },
+                    set: { settings.showBrandImages = $0 }
+                ))
+                if settings.showBrandImages {
+                    Toggle("Hide brand images for messages without a spam score", isOn: Binding(
+                        get: { settings.hideBrandImagesForMessagesWithoutSpamScore },
+                        set: { settings.hideBrandImagesForMessagesWithoutSpamScore = $0 }
+                    ))
+                    Stepper(value: Binding(
+                        get: { settings.hideBrandImagesAboveSpamThreshold },
+                        set: { settings.hideBrandImagesAboveSpamThreshold = min(100, max(0, $0)) }
+                    ), in: 0...100, step: 5) {
+                        Text("Hide brand images above spam score: \(Int(settings.hideBrandImagesAboveSpamThreshold))%")
+                    }
+                }
+            } header: {
+                Text("Brand Images (BIMI)")
+            } footer: {
+                Text(settings.showBrandImages
+                    ? "Looks up and displays the sender's published brand logo next to their identity, only when DMARC is a trusted pass. Fetching and rendering a remote image — even a logo the sender's own domain publishes — could be used as an attack vector against an unpatched vulnerability in macOS's image-decoding pipeline, the same risk as opening an image attachment from an untrusted sender. Only the logo's own domain is contacted, nothing else. The two options below only apply when a spam score is or isn't available, and are ignored entirely if \"Trust server spam headers\" is off and this message has no score."
+                    : "Off by default. Looks up and displays the sender's published brand logo next to their identity, only when DMARC is a trusted pass. Fetching and rendering a remote image — even a logo the sender's own domain publishes — could be used as an attack vector against an unpatched vulnerability in macOS's image-decoding pipeline, the same risk as opening an image attachment from an untrusted sender.")
+                    .font(.caption)
+            }
+
+            Section {
                 Picker("Page size", selection: Binding(
                     get: { settings.reportPageSize },
                     set: { settings.reportPageSize = $0 }
@@ -139,7 +165,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 940)
+        .frame(width: 460, height: 1060)
     }
 
     private func addAuthServID() {
