@@ -18,6 +18,7 @@ final class InspectorSettings {
     private static let trustAllAuthenticationResultsByDefaultKey = "trustAllAuthenticationResultsByDefault"
     private static let trustServerSpamHeadersKey = "trustServerSpamHeaders"
     private static let isObservationsSummaryEnabledKey = "isObservationsSummaryEnabled"
+    private static let reportPageSizeKey = "reportPageSize"
 
     var maxMessageSizeBytes: Int = InspectorSettings.defaultMaxMessageSizeBytes
 
@@ -74,11 +75,20 @@ final class InspectorSettings {
         }
     }
 
+    /// The page size used when exporting or sharing the report as a PDF.
+    var reportPageSize: ReportPageSize {
+        didSet {
+            UserDefaults.standard.set(reportPageSize.rawValue, forKey: Self.reportPageSizeKey)
+        }
+    }
+
     init() {
         trustedAuthServIDs = UserDefaults.standard.stringArray(forKey: Self.trustedAuthServIDsKey) ?? []
         trustAllAuthenticationResultsByDefault = UserDefaults.standard.object(forKey: Self.trustAllAuthenticationResultsByDefaultKey) as? Bool ?? true
         isPublicSuffixListUpdateEnabled = UserDefaults.standard.object(forKey: Self.publicSuffixListUpdateEnabledKey) as? Bool ?? true
         trustServerSpamHeaders = UserDefaults.standard.object(forKey: Self.trustServerSpamHeadersKey) as? Bool ?? false
         isObservationsSummaryEnabled = UserDefaults.standard.object(forKey: Self.isObservationsSummaryEnabledKey) as? Bool ?? false
+        reportPageSize = UserDefaults.standard.string(forKey: Self.reportPageSizeKey)
+            .flatMap(ReportPageSize.init(rawValue:)) ?? .usLetter
     }
 }

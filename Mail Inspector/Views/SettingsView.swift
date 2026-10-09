@@ -121,9 +121,25 @@ struct SettingsView: View {
                 Text("When on, a message's spam-filter headers (X-Spam-Score, Exchange's Spam Confidence Level, etc.) are shown as a likelihood gauge. Off by default: unlike SPF/DKIM/DMARC these headers follow no standard, their scoring is entirely filter-specific, and the gauge only rescales a number a filter already reported — it's never something this app determined independently.")
                     .font(.caption)
             }
+
+            Section {
+                Picker("Page size", selection: Binding(
+                    get: { settings.reportPageSize },
+                    set: { settings.reportPageSize = $0 }
+                )) {
+                    ForEach(ReportPageSize.allCases) { pageSize in
+                        Text(pageSize.displayName).tag(pageSize)
+                    }
+                }
+            } header: {
+                Text("Report Export (⌘E / ⇧⌘E)")
+            } footer: {
+                Text("The page size used when exporting or sharing the report as a PDF. The report is automatically paginated to fit, with a page number in the footer of each page.")
+                    .font(.caption)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 860)
+        .frame(width: 460, height: 940)
     }
 
     private func addAuthServID() {

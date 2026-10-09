@@ -12,6 +12,7 @@ struct MailInspectorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var settings = InspectorSettings()
     @State private var fileOpenRequest = FileOpenRequest()
+    @State private var reportExportRequest = ReportExportRequest()
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,7 @@ struct MailInspectorApp: App {
                 .environment(settings)
                 .environment(appDelegate.pendingImports)
                 .environment(fileOpenRequest)
+                .environment(reportExportRequest)
         }
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -26,6 +28,16 @@ struct MailInspectorApp: App {
                     fileOpenRequest.fire()
                 }
                 .keyboardShortcut("o", modifiers: .command)
+            }
+            CommandGroup(after: .newItem) {
+                Button("Export Report as PDF…") {
+                    reportExportRequest.fireExport()
+                }
+                .keyboardShortcut("e", modifiers: .command)
+                Button("Share Report…") {
+                    reportExportRequest.fireShare()
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
             }
         }
         Settings {

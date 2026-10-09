@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
@@ -17,6 +18,11 @@ struct ContentView: View {
     @Environment(InspectorSettings.self) private var settings
     @Environment(PendingImportQueue.self) private var pendingImports
     @Environment(FileOpenRequest.self) private var fileOpenRequest
+    @Environment(ReportExportRequest.self) private var reportExportRequest
+
+    private var selectedMessage: EmailMessage? {
+        messages.first { $0.id == selection }
+    }
 
     private static var emlContentTypes: [UTType] {
         [UTType(filenameExtension: "eml") ?? .data]
@@ -52,6 +58,16 @@ struct ContentView: View {
                 }
             }
             .toolbar {
+                if selectedMessage != nil {
+                    ToolbarItem {
+                        Button {
+                            shareSelectedMessageAsPDF()
+                        } label: {
+                            Label("Share Report…", systemImage: "square.and.arrow.up")
+                        }
+                        .accessibilityLabel("Share report as PDF")
+                    }
+                }
                 ToolbarItem {
                     Button {
                         isImporterPresented = true
@@ -135,6 +151,56 @@ struct ContentView: View {
         }
         .onChange(of: fileOpenRequest.token) { _, _ in
             isImporterPresented = true
+        }
+        .onChange(of: reportExportRequest.exportToken) { _, _ in
+            exportSelectedMessageAsPDF()
+        }
+        .onChange(of: reportExportRequest.shareToken) { _, _ in
+            shareSelectedMessageAsPDF()
+        }
+    }
+
+    /// ⌘E and the toolbar's "Open Email File…" button both present panels — this one lets the
+    /// user pick where to save the rendered report instead of just writing it somewhere fixed.
+    private func exportSelectedMessageAsPDF() {
+        guard let message = selectedMessage,
+              let pdfData = ReportPDFExporter.renderPDF(for: message, settings: settings, pageSize: settings.reportPageSize) else { return }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = ReportPDFExporter.suggestedFileName(for: message)
+        panel.canCreateDirectories = true
+
+        let completion: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else { return }
+            try? pdfData.write(to: url)
+        }
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: completion)
+        } else {
+            panel.begin(completionHandler: completion)
+        }
+    }
+
+    /// ⇧⌘E and the toolbar's Share button — renders to a temp file so the system share sheet
+    /// (Mail, Messages, AirDrop, Save to Files, …) sees a real PDF with a sensible filename
+    /// rather than opaque in-memory data.
+    private func shareSelectedMessageAsPDF() {
+        guard let message = selectedMessage,
+              let pdfData = ReportPDFExporter.renderPDF(for: message, settings: settings, pageSize: settings.reportPageSize) else { return }
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: tempURL, withIntermediateDirectories: true)
+            let fileURL = tempURL.appendingPathComponent(ReportPDFExporter.suggestedFileName(for: message))
+            try pdfData.write(to: fileURL)
+
+            guard let contentView = NSApp.keyWindow?.contentView else { return }
+            let picker = NSSharingServicePicker(items: [fileURL])
+            picker.show(relativeTo: .zero, of: contentView, preferredEdge: .maxY)
+        } catch {
+            importErrorMessage = "Could not prepare the report for sharing: \(error.localizedDescription)"
         }
     }
 
