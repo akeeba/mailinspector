@@ -43,12 +43,23 @@ struct ReceivedHeaderParserTests {
         #expect(hop.verifiedFromHostname == "actual-ptr.evil.example")
     }
 
-    @Test("Parses a bracketed IP literal with no parenthetical remark")
+    @Test("Parses a bracketed IP literal with no parenthetical remark, and claims no hostname at all")
     func bracketedIPWithoutParenthetical() throws {
         let raw = "Received: from [10.0.0.5] by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"
         let message = try makeTestMessage(raw)
         let hop = ReceivedHeaderParser.parseAll(from: message.parsed)[0]
         #expect(hop.fromIPAddress == "10.0.0.5")
+        #expect(hop.claimedFromHostname == nil)
+    }
+
+    @Test("A bracketed IP literal that matches its own reverse-DNS remark claims no hostname, so it's never a mismatch")
+    func bracketedIPLiteralMatchingItsOwnReverseDNSIsNotAClaimedHostname() throws {
+        let raw = "Received: from [127.0.0.1] (localhost [127.0.0.1]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let hop = ReceivedHeaderParser.parseAll(from: message.parsed)[0]
+        #expect(hop.claimedFromHostname == nil)
+        #expect(hop.verifiedFromHostname == "localhost")
+        #expect(hop.fromIPAddress == "127.0.0.1")
     }
 
     @Test("Strips the IPv6: prefix from a bracketed IPv6 address")

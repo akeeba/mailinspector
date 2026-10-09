@@ -96,6 +96,14 @@ struct DeliveryPathAnalyzerTests {
         #expect(analysis.hops[0].flags.isEmpty)
     }
 
+    @Test("Does not flag a loopback hop whose from-clause is a bracketed IP literal matching its own reverse-DNS remark")
+    func bracketedIPLiteralMatchingItsOwnReverseDNSIsNotFlagged() throws {
+        let raw = "Received: from [127.0.0.1] (localhost [127.0.0.1]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
+        #expect(analysis.hops[0].flags.isEmpty)
+    }
+
     @Test("Flags a claimed hostname that contradicts reverse DNS as a warning — this is the genuinely forged-looking case")
     func forgedLookingHostnameMismatchIsAWarning() throws {
         let raw = "Received: from totally-different.example (actual-ptr.evil.example [203.0.113.5]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"

@@ -156,14 +156,31 @@ nonisolated enum ReceivedHeaderParser {
         if let (inner, beforeParen) = firstMatchedParenthetical(in: text) {
             let claimedText = String(text[beforeParen]).trimmingCharacters(in: .whitespaces)
             let (verified, ip) = parseParenthetical(inner)
+            // "from [127.0.0.1] (localhost [127.0.0.1])" — the sending side claimed only its own
+            // bracketed IP literal, not a hostname at all. Treating "[127.0.0.1]" as a claimed
+            // hostname and comparing it against the receiver's reverse-DNS result ("localhost")
+            // produced a false "claimed hostname doesn't match reverse DNS" warning on every hop
+            // of this shape — entirely consistent, not a mismatch, since nothing resembling a
+            // hostname was actually claimed.
+            if isBracketedIPLiteral(claimedText) {
+                return (nil, verified, ip)
+            }
             let claimed = claimedText.isEmpty ? nil : claimedText
             return (claimed ?? firstToken(text), verified, ip)
         }
 
         if let ip = extractBracketedAddress(text) {
-            return (text.trimmingCharacters(in: .whitespaces), nil, ip)
+            let trimmed = text.trimmingCharacters(in: .whitespaces)
+            return (isBracketedIPLiteral(trimmed) ? nil : trimmed, nil, ip)
         }
         return (firstToken(text), nil, nil)
+    }
+
+    /// True when `text` is nothing but a single bracketed IP literal (optionally with the
+    /// `IPv6:` prefix) — e.g. `"[127.0.0.1]"` or `"[IPv6:::1]"` — with no actual hostname text
+    /// alongside it.
+    private static func isBracketedIPLiteral(_ text: String) -> Bool {
+        text.hasPrefix("[") && text.hasSuffix("]") && extractBracketedAddress(text) != nil
     }
 
     /// Finds the first `(...)` group, respecting nesting, and returns its inner content plus
