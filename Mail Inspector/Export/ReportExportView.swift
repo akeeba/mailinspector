@@ -39,7 +39,7 @@ struct ReportExportView: View {
     var aiInsights: AIInsightsExportSummary? = nil
 
     private var senderIdentityAnalysis: SenderIdentityAnalysis {
-        SenderIdentityAnalyzer.analyze(message: message, trustedReplyToDomainsByRecipient: settings.trustedReplyToDomainsByRecipient)
+        SenderIdentityAnalyzer.analyze(message: message, trustedReplyToDomainsBySender: settings.trustedReplyToDomainsBySender)
     }
 
     private var authenticationAnalysis: AuthenticationAnalysis {

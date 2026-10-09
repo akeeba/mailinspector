@@ -1,5 +1,9 @@
 # Mail Inspector
 
+Inspect the legitimacy of the emails you receive in Apple Mail on macOS
+
+## Overview
+
 Mail Inspector is a native macOS app for inspecting potentially malicious email without opening
 it in Apple Mail. Drop an `.eml` file, open it from Finder, or drag a message onto the Dock icon,
 and Mail Inspector parses the raw RFC 5322 source and shows you:

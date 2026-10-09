@@ -105,7 +105,9 @@ struct SenderIdentityView: View {
                     detailRow("Date (unparsed)", raw)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

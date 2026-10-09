@@ -62,7 +62,7 @@ struct SenderIdentityAnalyzerTests {
         #expect(analysis.observations.contains { $0.title == "Mixed-script characters in display name" })
     }
 
-    @Test("Exposes an actionable ReplyToMismatch naming every To/Cc recipient when the domain isn't yet trusted")
+    @Test("Exposes an actionable ReplyToMismatch naming the sender when the domain isn't yet trusted, regardless of recipient")
     func replyToMismatchIsActionable() throws {
         let message = try makeTestMessage("From: billing@bank.example\r\nReply-To: attacker@evil.example\r\nTo: sales@mycompany.example\r\nCc: ops@mycompany.example\r\n\r\n")
         let analysis = SenderIdentityAnalyzer.analyze(message: message)
@@ -70,18 +70,28 @@ struct SenderIdentityAnalyzerTests {
         let mismatch = try #require(analysis.replyToMismatch)
         #expect(mismatch.replyToDomain == "evil.example")
         #expect(mismatch.fromDomain == "bank.example")
-        #expect(Set(mismatch.recipients) == Set(["sales@mycompany.example", "ops@mycompany.example"]))
+        #expect(mismatch.sender == "billing@bank.example")
     }
 
-    @Test("Suppresses the Reply-To mismatch entirely once the domain is trusted for a recipient of the message")
+    @Test("Suppresses the Reply-To mismatch entirely once the domain is trusted for this sender, regardless of recipient")
     func trustedReplyToDomainSuppressesTheMismatch() throws {
         let message = try makeTestMessage("From: billing@bank.example\r\nReply-To: attacker@evil.example\r\nTo: sales@mycompany.example\r\n\r\n")
         let analysis = SenderIdentityAnalyzer.analyze(
             message: message,
-            trustedReplyToDomainsByRecipient: ["sales@mycompany.example": ["evil.example"]]
+            trustedReplyToDomainsBySender: ["billing@bank.example": ["evil.example"]]
         )
         #expect(!analysis.observations.contains { $0.title == "Reply-To domain differs from From" })
         #expect(analysis.replyToMismatch == nil)
+    }
+
+    @Test("Still flags the mismatch for a different recipient than the one originally trusted, confirming trust is keyed by sender, not recipient")
+    func trustIsIndependentOfRecipient() throws {
+        let message = try makeTestMessage("From: billing@bank.example\r\nReply-To: attacker@evil.example\r\nTo: someone-else@mycompany.example\r\n\r\n")
+        let analysis = SenderIdentityAnalyzer.analyze(
+            message: message,
+            trustedReplyToDomainsBySender: ["billing@bank.example": ["evil.example"]]
+        )
+        #expect(!analysis.observations.contains { $0.title == "Reply-To domain differs from From" })
     }
 
     @Test("A clean message with no discrepancies produces no observations")

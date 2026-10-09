@@ -7,16 +7,16 @@
 
 import Foundation
 
-/// A Reply-To domain that doesn't organizationally match From, and isn't (yet) trusted for any
-/// recipient of this message — exposed separately from `observations` so `SenderIdentityView`
-/// can offer a "Mark as Safe" action right next to the Reply-To row itself, regardless of
-/// whether the opt-in "Noteworthy Observations" panel is even enabled.
+/// A Reply-To domain that doesn't organizationally match From, and isn't (yet) trusted for this
+/// sender — exposed separately from `observations` so `SenderIdentityView` can offer a "Mark as
+/// Safe" action right next to the Reply-To row itself, regardless of whether the opt-in
+/// "Noteworthy Observations" panel is even enabled.
 nonisolated struct ReplyToMismatch: Sendable, Equatable {
     let replyToDomain: String
     let fromDomain: String
-    /// Every To/Cc recipient address on this message — marking the mismatch "safe" trusts the
-    /// Reply-To domain for all of them at once, rather than requiring the user to pick one.
-    let recipients: [String]
+    /// The message's own From address — trust is a property of who *sent* the message and which
+    /// address they prefer replies go to, never of who happened to receive this particular copy.
+    let sender: String
 }
 
 nonisolated struct SenderIdentityAnalysis: Sendable {
@@ -29,11 +29,12 @@ nonisolated struct SenderIdentityAnalysis: Sendable {
 /// that differs from From is routine for many legitimate bulk senders, and an IDN domain is not
 /// inherently an impersonation attempt.
 nonisolated enum SenderIdentityAnalyzer {
-    /// `trustedReplyToDomainsByRecipient` is keyed by lowercased recipient address, each value a
-    /// list of lowercased Reply-To domains the user has explicitly marked safe for that
-    /// recipient (see `InspectorSettings.trustReplyToDomain(_:forRecipients:)`) — e.g. a sales
-    /// alias whose replies are deliberately routed to a different domain's help desk.
-    static func analyze(message: EmailMessage, trustedReplyToDomainsByRecipient: [String: [String]] = [:]) -> SenderIdentityAnalysis {
+    /// `trustedReplyToDomainsBySender` is keyed by lowercased From address, each value a list of
+    /// lowercased Reply-To domains the user has explicitly marked safe for that sender (see
+    /// `InspectorSettings.trustReplyToDomain(_:forSender:)`) — e.g. a vendor whose messages
+    /// always route replies to a separate help-desk domain, regardless of which of the user's
+    /// own addresses received this particular message.
+    static func analyze(message: EmailMessage, trustedReplyToDomainsBySender: [String: [String]] = [:]) -> SenderIdentityAnalysis {
         var observations: [SecurityObservation] = []
         var nextID = 0
         func add(_ severity: ObservationSeverity, _ title: String, _ detail: String) {
@@ -66,16 +67,11 @@ nonisolated enum SenderIdentityAnalyzer {
 
         if case .mailbox(let replyTo) = message.replyToEntries.first, !replyTo.domain.isEmpty {
             if DomainAlignment.align(from.domain, replyTo.domain) == .notAligned {
-                let recipients = flatAddresses(message.toEntries) + flatAddresses(message.ccEntries)
-                let isTrusted = recipients.contains { recipient in
-                    (trustedReplyToDomainsByRecipient[recipient.lowercased()] ?? [])
-                        .contains { $0.caseInsensitiveCompare(replyTo.domain) == .orderedSame }
-                }
+                let isTrusted = (trustedReplyToDomainsBySender[from.address.lowercased()] ?? [])
+                    .contains { $0.caseInsensitiveCompare(replyTo.domain) == .orderedSame }
                 if !isTrusted {
                     add(.notable, "Reply-To domain differs from From", "Reply-To (\u{201c}\(replyTo.domain)\u{201d}) is not organizationally related to the From domain (\u{201c}\(from.domain)\u{201d}). Replies would go somewhere other than where the message claims to be from.")
-                    if !recipients.isEmpty {
-                        replyToMismatch = ReplyToMismatch(replyToDomain: replyTo.domain, fromDomain: from.domain, recipients: recipients)
-                    }
+                    replyToMismatch = ReplyToMismatch(replyToDomain: replyTo.domain, fromDomain: from.domain, sender: from.address)
                 }
             }
         }
@@ -87,19 +83,6 @@ nonisolated enum SenderIdentityAnalyzer {
         }
 
         return SenderIdentityAnalysis(observations: observations, replyToMismatch: replyToMismatch)
-    }
-
-    /// Flattens an address-list header's entries into plain addresses, dropping group names and
-    /// malformed segments — used to find every real recipient a Reply-To trust decision should
-    /// apply to.
-    private static func flatAddresses(_ entries: [AddressListEntry]) -> [String] {
-        entries.flatMap { entry -> [String] in
-            switch entry {
-            case .mailbox(let address): return [address.address]
-            case .group(_, let members): return members.map(\.address)
-            case .malformed: return []
-            }
-        }
     }
 
     private static func extractEmailAddress(from text: String) -> String? {

@@ -27,7 +27,7 @@ final class InspectorSettings {
     private static let aiActiveProviderKeyKey = "aiActiveProviderKey"
     private static let aiProviderEndpointsKey = "aiProviderEndpoints"
     private static let aiProviderModelNamesKey = "aiProviderModelNames"
-    private static let trustedReplyToDomainsByRecipientKey = "trustedReplyToDomainsByRecipient"
+    private static let trustedReplyToDomainsBySenderKey = "trustedReplyToDomainsBySender"
     private static let trustedHostnameMismatchesKey = "trustedHostnameMismatches"
 
     var maxMessageSizeBytes: Int = InspectorSettings.defaultMaxMessageSizeBytes
@@ -176,15 +176,16 @@ final class InspectorSettings {
         }
     }
 
-    /// Reply-To domains explicitly marked safe for specific recipients of the user's own — e.g.
-    /// a sales alias whose replies are deliberately routed to a different domain's help desk.
-    /// Keyed by lowercased recipient address; each value is the list of lowercased Reply-To
-    /// domains trusted for that recipient. Grown only via `trustReplyToDomain(_:forRecipients:)`,
-    /// driven by a "Mark as Safe" action next to the mismatch itself in the report — not meant to
-    /// be hand-typed.
-    var trustedReplyToDomainsByRecipient: [String: [String]] {
+    /// Reply-To domains explicitly marked safe for specific senders — e.g. a vendor whose
+    /// messages always route replies to a separate help-desk domain. Keyed by lowercased From
+    /// address; each value is the list of lowercased Reply-To domains trusted for that sender.
+    /// Deliberately keyed by sender, not by recipient: this is the sender's own routing
+    /// preference, true regardless of which of the user's addresses happened to receive any
+    /// given message. Grown only via `trustReplyToDomain(_:forSender:)`, driven by a "Mark as
+    /// Safe" action next to the mismatch itself in the report — not meant to be hand-typed.
+    var trustedReplyToDomainsBySender: [String: [String]] {
         didSet {
-            UserDefaults.standard.set(trustedReplyToDomainsByRecipient, forKey: Self.trustedReplyToDomainsByRecipientKey)
+            UserDefaults.standard.set(trustedReplyToDomainsBySender, forKey: Self.trustedReplyToDomainsBySenderKey)
         }
     }
 
@@ -215,7 +216,7 @@ final class InspectorSettings {
         aiActiveProviderKey = UserDefaults.standard.string(forKey: Self.aiActiveProviderKeyKey) ?? AIProviderCatalog.onDevice.key
         aiProviderEndpoints = UserDefaults.standard.dictionary(forKey: Self.aiProviderEndpointsKey) as? [String: String] ?? [:]
         aiProviderModelNames = UserDefaults.standard.dictionary(forKey: Self.aiProviderModelNamesKey) as? [String: String] ?? [:]
-        trustedReplyToDomainsByRecipient = UserDefaults.standard.dictionary(forKey: Self.trustedReplyToDomainsByRecipientKey) as? [String: [String]] ?? [:]
+        trustedReplyToDomainsBySender = UserDefaults.standard.dictionary(forKey: Self.trustedReplyToDomainsBySenderKey) as? [String: [String]] ?? [:]
         if let data = UserDefaults.standard.data(forKey: Self.trustedHostnameMismatchesKey),
            let decoded = try? JSONDecoder().decode([TrustedHostnameMismatch].self, from: data) {
             trustedHostnameMismatches = decoded
@@ -224,28 +225,26 @@ final class InspectorSettings {
         }
     }
 
-    /// Marks a Reply-To domain safe for every given recipient — called from the "Mark as Safe"
-    /// action next to a Reply-To mismatch in the report, never meant to be hand-typed.
-    func trustReplyToDomain(_ domain: String, forRecipients recipients: [String]) {
+    /// Marks a Reply-To domain safe for a given sender — called from the "Mark as Safe" action
+    /// next to a Reply-To mismatch in the report, never meant to be hand-typed.
+    func trustReplyToDomain(_ domain: String, forSender sender: String) {
         let normalizedDomain = domain.lowercased()
-        for recipient in recipients {
-            let key = recipient.lowercased()
-            var domains = trustedReplyToDomainsByRecipient[key] ?? []
-            guard !domains.contains(normalizedDomain) else { continue }
-            domains.append(normalizedDomain)
-            trustedReplyToDomainsByRecipient[key] = domains
-        }
+        let key = sender.lowercased()
+        var domains = trustedReplyToDomainsBySender[key] ?? []
+        guard !domains.contains(normalizedDomain) else { return }
+        domains.append(normalizedDomain)
+        trustedReplyToDomainsBySender[key] = domains
     }
 
-    /// Removes a single recipient/Reply-To-domain trust entry — used by Settings' review list.
-    func removeTrustedReplyToDomain(_ domain: String, forRecipient recipient: String) {
-        let key = recipient.lowercased()
-        guard var domains = trustedReplyToDomainsByRecipient[key] else { return }
+    /// Removes a single sender/Reply-To-domain trust entry — used by Settings' review list.
+    func removeTrustedReplyToDomain(_ domain: String, forSender sender: String) {
+        let key = sender.lowercased()
+        guard var domains = trustedReplyToDomainsBySender[key] else { return }
         domains.removeAll { $0.caseInsensitiveCompare(domain) == .orderedSame }
         if domains.isEmpty {
-            trustedReplyToDomainsByRecipient.removeValue(forKey: key)
+            trustedReplyToDomainsBySender.removeValue(forKey: key)
         } else {
-            trustedReplyToDomainsByRecipient[key] = domains
+            trustedReplyToDomainsBySender[key] = domains
         }
     }
 

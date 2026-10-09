@@ -28,7 +28,7 @@ struct MessageDetailView: View {
     private let arrowScrollStep: CGFloat = 60
 
     private var senderIdentityAnalysis: SenderIdentityAnalysis {
-        SenderIdentityAnalyzer.analyze(message: message, trustedReplyToDomainsByRecipient: settings.trustedReplyToDomainsByRecipient)
+        SenderIdentityAnalyzer.analyze(message: message, trustedReplyToDomainsBySender: settings.trustedReplyToDomainsBySender)
     }
 
     private var authenticationAnalysis: AuthenticationAnalysis {
@@ -126,7 +126,7 @@ struct MessageDetailView: View {
                         replyToMismatch: senderIdentityAnalysis.replyToMismatch,
                         onTrustReplyToDomain: {
                             guard let mismatch = senderIdentityAnalysis.replyToMismatch else { return }
-                            settings.trustReplyToDomain(mismatch.replyToDomain, forRecipients: mismatch.recipients)
+                            settings.trustReplyToDomain(mismatch.replyToDomain, forSender: mismatch.sender)
                         }
                     )
                         .focusable()

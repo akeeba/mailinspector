@@ -76,26 +76,26 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(entry.domain)
                                     .textSelection(.enabled)
-                                Text("for \(entry.recipient)")
+                                Text("for mail from \(entry.sender)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Button {
-                                settings.removeTrustedReplyToDomain(entry.domain, forRecipient: entry.recipient)
+                                settings.removeTrustedReplyToDomain(entry.domain, forSender: entry.sender)
                             } label: {
                                 Image(systemName: "minus.circle.fill")
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
-                            .accessibilityLabel("Remove \(entry.domain) for \(entry.recipient)")
+                            .accessibilityLabel("Remove \(entry.domain) for mail from \(entry.sender)")
                         }
                     }
                 }
             } header: {
                 Text("Trusted Reply-To Domains")
             } footer: {
-                Text("Some recipients deliberately route replies to a different domain (e.g. a sales alias whose replies go to a separate help desk) — this app would otherwise flag that as a Reply-To mismatch every time. Entries here suppress that specific notice for that specific recipient.")
+                Text("Some senders deliberately route replies to a different domain (e.g. a vendor whose replies go to a separate help desk) — this app would otherwise flag that as a Reply-To mismatch every time. Entries here suppress that specific notice for mail from that specific sender, regardless of which of your addresses it was sent to.")
                     .font(.caption)
             }
 
@@ -278,21 +278,21 @@ struct SettingsView: View {
     }
 
     private struct TrustedReplyToEntry: Hashable {
-        let recipient: String
+        let sender: String
         let domain: String
     }
 
-    /// Flattens `trustedReplyToDomainsByRecipient`'s `[recipient: [domain]]` shape into one row
-    /// per (recipient, domain) pair, sorted for a stable display order.
+    /// Flattens `trustedReplyToDomainsBySender`'s `[sender: [domain]]` shape into one row per
+    /// (sender, domain) pair, sorted for a stable display order.
     private var trustedReplyToEntries: [TrustedReplyToEntry] {
         var entries: [TrustedReplyToEntry] = []
-        for (recipient, domains) in settings.trustedReplyToDomainsByRecipient {
+        for (sender, domains) in settings.trustedReplyToDomainsBySender {
             for domain in domains {
-                entries.append(TrustedReplyToEntry(recipient: recipient, domain: domain))
+                entries.append(TrustedReplyToEntry(sender: sender, domain: domain))
             }
         }
         return entries.sorted { lhs, rhs in
-            guard lhs.recipient == rhs.recipient else { return lhs.recipient < rhs.recipient }
+            guard lhs.sender == rhs.sender else { return lhs.sender < rhs.sender }
             return lhs.domain < rhs.domain
         }
     }
