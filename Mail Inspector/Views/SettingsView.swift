@@ -99,6 +99,18 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Show Noteworthy Observations", isOn: Binding(
+                    get: { settings.isObservationsSummaryEnabled },
+                    set: { settings.isObservationsSummaryEnabled = $0 }
+                ))
+            } header: {
+                Text("Noteworthy Observations")
+            } footer: {
+                Text("Off by default. When on, a summary panel highlights sender-identity discrepancies and delivery-path anomalies. In practice, most delivery-path flags are ordinary hops within a legitimate sender's own SaaS infrastructure (for example, an app server relaying through an internal mail sender before reaching the public internet) — normal for most legitimate email, not a sign of anything wrong.")
+                    .font(.caption)
+            }
+
+            Section {
                 Toggle("Trust server spam headers", isOn: Binding(
                     get: { settings.trustServerSpamHeaders },
                     set: { settings.trustServerSpamHeaders = $0 }
@@ -111,7 +123,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 760)
+        .frame(width: 460, height: 860)
     }
 
     private func addAuthServID() {

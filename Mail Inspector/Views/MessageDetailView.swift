@@ -51,28 +51,55 @@ struct MessageDetailView: View {
             }
     }
 
+    private enum ReportSection: Hashable {
+        case authentication
+        case deliveryPath
+        case spam
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                ObservationsSummaryView(observations: combinedObservations)
-                SenderIdentityView(message: message)
-                Divider()
-                AuthenticationView(analysis: authenticationAnalysis, spfRecheckTarget: spfRecheckTarget)
-                if let spamAssessment {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if settings.isObservationsSummaryEnabled {
+                        ObservationsSummaryView(observations: combinedObservations)
+                    }
+                    SenderIdentityView(message: message)
+                    SummaryBlocksView(
+                        authentication: authenticationAnalysis,
+                        deliveryPath: deliveryPathAnalysis,
+                        spamAssessment: spamAssessment,
+                        onTapAuthentication: { scrollTo(.authentication, proxy: proxy) },
+                        onTapHops: { scrollTo(.deliveryPath, proxy: proxy) },
+                        onTapSpam: { scrollTo(.spam, proxy: proxy) }
+                    )
                     Divider()
-                    SpamLikelihoodView(assessment: spamAssessment)
-                }
-                Divider()
-                DeliveryPathView(analysis: deliveryPathAnalysis)
-                if !additionalHeaders.isEmpty {
+                    AuthenticationView(analysis: authenticationAnalysis, spfRecheckTarget: spfRecheckTarget)
+                        .id(ReportSection.authentication)
+                    if let spamAssessment {
+                        Divider()
+                        SpamLikelihoodView(assessment: spamAssessment)
+                            .id(ReportSection.spam)
+                    }
                     Divider()
-                    AdditionalSecurityHeadersView(headers: additionalHeaders)
+                    DeliveryPathView(analysis: deliveryPathAnalysis)
+                        .id(ReportSection.deliveryPath)
+                    if !additionalHeaders.isEmpty {
+                        Divider()
+                        AdditionalSecurityHeadersView(headers: additionalHeaders)
+                    }
+                    Divider()
+                    RawHeadersView(message: message)
                 }
-                Divider()
-                RawHeadersView(message: message)
+                .padding()
             }
-            .padding()
         }
         .navigationTitle(message.subject ?? "(No Subject)")
+    }
+
+    private func scrollTo(_ section: ReportSection, proxy: ScrollViewProxy) {
+        withAnimation {
+            proxy.scrollTo(section, anchor: .top)
+        }
     }
 }

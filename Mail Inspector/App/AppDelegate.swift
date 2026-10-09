@@ -40,14 +40,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        pendingImports.enqueue(urls)
-
+        // Close any phantom window (see the type's doc comment) *before* enqueuing, not after.
+        // Both windows' ContentView share this same PendingImportQueue instance via the
+        // environment, so if the phantom window were still alive when the queue changed, its
+        // onChange could win the race to drain it — appending the imported message to a
+        // ContentView instance that's about to be torn down, instead of the surviving one.
         DispatchQueue.main.async {
-            guard let mainWindow = self.mainWindow, NSApp.windows.count > 1 else { return }
-            for window in NSApp.windows where window !== mainWindow {
-                window.close()
+            if let mainWindow = self.mainWindow, NSApp.windows.count > 1 {
+                for window in NSApp.windows where window !== mainWindow {
+                    window.close()
+                }
+                mainWindow.makeKeyAndOrderFront(nil)
             }
-            mainWindow.makeKeyAndOrderFront(nil)
+            self.pendingImports.enqueue(urls)
         }
     }
 }

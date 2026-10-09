@@ -17,6 +17,7 @@ final class InspectorSettings {
     private static let publicSuffixListUpdateEnabledKey = "publicSuffixListUpdateEnabled"
     private static let trustAllAuthenticationResultsByDefaultKey = "trustAllAuthenticationResultsByDefault"
     private static let trustServerSpamHeadersKey = "trustServerSpamHeaders"
+    private static let isObservationsSummaryEnabledKey = "isObservationsSummaryEnabled"
 
     var maxMessageSizeBytes: Int = InspectorSettings.defaultMaxMessageSizeBytes
 
@@ -62,10 +63,22 @@ final class InspectorSettings {
         }
     }
 
+    /// Whether to show the "Noteworthy Observations" summary (sender-identity discrepancies and
+    /// delivery-path anomalies) at the top of a message. Off by default: in practice, most of
+    /// what it flags is delivery hops within a legitimate sender's own SaaS infrastructure
+    /// (an app server relaying through an internal mail sender, for instance), which is normal
+    /// and not actually noteworthy — not a message-specific red flag.
+    var isObservationsSummaryEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isObservationsSummaryEnabled, forKey: Self.isObservationsSummaryEnabledKey)
+        }
+    }
+
     init() {
         trustedAuthServIDs = UserDefaults.standard.stringArray(forKey: Self.trustedAuthServIDsKey) ?? []
         trustAllAuthenticationResultsByDefault = UserDefaults.standard.object(forKey: Self.trustAllAuthenticationResultsByDefaultKey) as? Bool ?? true
         isPublicSuffixListUpdateEnabled = UserDefaults.standard.object(forKey: Self.publicSuffixListUpdateEnabledKey) as? Bool ?? true
         trustServerSpamHeaders = UserDefaults.standard.object(forKey: Self.trustServerSpamHeadersKey) as? Bool ?? false
+        isObservationsSummaryEnabled = UserDefaults.standard.object(forKey: Self.isObservationsSummaryEnabledKey) as? Bool ?? false
     }
 }

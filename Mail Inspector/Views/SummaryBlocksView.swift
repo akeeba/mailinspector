@@ -1,0 +1,109 @@
+//
+//  Mail Inspector
+//
+//  Copyright (c) 2026 Nicholas K. Dionysopoulos
+//  Licensed under the MIT License. See license.txt in the project root for details.
+//
+
+import SwiftUI
+
+/// A row of at-a-glance summary blocks — SPF, DKIM, DMARC, delivery-path hops, and (when
+/// available) the spam-likelihood score. Each block is a shortcut: tapping it jumps to the
+/// corresponding section further down the report, it never shows information found nowhere
+/// else in this view.
+struct SummaryBlocksView: View {
+    let authentication: AuthenticationAnalysis
+    let deliveryPath: DeliveryPathAnalysis
+    let spamAssessment: SpamLikelihoodAssessment?
+    let onTapAuthentication: () -> Void
+    let onTapHops: () -> Void
+    let onTapSpam: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SummaryBlock(
+                title: "SPF",
+                value: authentication.spf.verdict.displayLabel,
+                systemImage: authentication.spf.verdict.symbolName,
+                tintColor: authentication.spf.verdict.tintColor,
+                action: onTapAuthentication
+            )
+            SummaryBlock(
+                title: "DKIM",
+                value: authentication.dkim.verdict.displayLabel,
+                systemImage: authentication.dkim.verdict.symbolName,
+                tintColor: authentication.dkim.verdict.tintColor,
+                action: onTapAuthentication
+            )
+            SummaryBlock(
+                title: "DMARC",
+                value: authentication.dmarc.verdict.displayLabel,
+                systemImage: authentication.dmarc.verdict.symbolName,
+                tintColor: authentication.dmarc.verdict.tintColor,
+                action: onTapAuthentication
+            )
+            SummaryBlock(
+                title: "Hops",
+                value: "\(deliveryPath.hops.count)",
+                systemImage: hopsHaveWarnings ? "exclamationmark.triangle.fill" : nil,
+                tintColor: hopsHaveWarnings ? .orange : .primary,
+                action: onTapHops
+            )
+            if let spamAssessment {
+                SummaryBlock(
+                    title: "Spam Score",
+                    value: "\(Int(spamAssessment.percentage.rounded()))%",
+                    systemImage: nil,
+                    tintColor: spamTintColor(for: spamAssessment.percentage),
+                    action: onTapSpam
+                )
+            }
+        }
+    }
+
+    private var hopsHaveWarnings: Bool {
+        deliveryPath.hops.contains { !$0.warnings.isEmpty }
+    }
+
+    private func spamTintColor(for percentage: Double) -> Color {
+        switch percentage {
+        case ..<33: return .green
+        case ..<66: return .orange
+        default: return .red
+        }
+    }
+}
+
+private struct SummaryBlock: View {
+    let title: String
+    let value: String
+    let systemImage: String?
+    let tintColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.title3)
+                        .foregroundStyle(tintColor)
+                }
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tintColor)
+                    .lineLimit(1)
+            }
+            .frame(minWidth: 88, minHeight: 72)
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
+        .accessibilityHint("Jumps to the \(title) section of the report.")
+    }
+}

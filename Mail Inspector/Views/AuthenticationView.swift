@@ -61,7 +61,7 @@ private struct VerdictBadge: View {
     }
 }
 
-private extension AuthenticationVerdict {
+extension AuthenticationVerdict {
     var displayLabel: String {
         switch self {
         case .pass: return "Pass"
