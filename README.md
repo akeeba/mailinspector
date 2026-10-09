@@ -20,6 +20,15 @@ and Mail Inspector parses the raw RFC 5322 source and shows you:
   infrastructure as proof of wrongdoing.
 - **Raw headers** — a searchable, monospaced, read-only view of the complete original headers.
 
+> [!IMPORTANT]
+> You cannot drag a mail directly onto the app window. This is a limitation of macOS and Mail.app.
+> When dragging an email onto an application, Mail.app only includes a message ID to create a deep
+> link which opens the mail in Mail.app. It does not send the mail content itself, let alone the
+> mail headers we actually need to analyse. When you are dragging an email onto an app'sDock icon,
+> though, it sends the entire email message – and that's why that drag and drop operation works.
+> Yes, it is annoying and inconsistent. That's how Apple designed it. I can only work with what
+> Apple gives me to work with, folks.
+
 Mail Inspector never renders HTML, never executes scripts or attachments, and never follows links.
 Message content is never logged or persisted beyond what you explicitly import.
 
