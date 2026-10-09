@@ -24,6 +24,7 @@ nonisolated enum AIProviderAuthScheme: String, Sendable, Equatable {
 }
 
 nonisolated enum AIProviderKind: Sendable, Equatable {
+    case disabled
     case onDevice
     case remote(AIWireDialect)
 }
@@ -49,11 +50,25 @@ nonisolated struct AIProviderDefinition: Sendable, Equatable, Identifiable {
     var id: String { key }
 }
 
-/// The catalogue of AI backends offered in Settings. Display order (not alphabetical): LM Studio
-/// first ("Recommended" — private, local, and far better at non-English text than the on-device
-/// model), then On-Device Apple Intelligence (the zero-config default), then — once added — the
-/// hosted commercial catalogue, with Custom always last as the escape hatch for anything else.
+/// The catalogue of AI backends offered in Settings. Display order (not alphabetical): Disabled
+/// first (turns the feature off entirely), then LM Studio ("Recommended" — private, local, and
+/// far better at non-English text than the on-device model), then On-Device Apple Intelligence
+/// (the zero-config default), then the hosted commercial catalogue, with Custom always last as
+/// the escape hatch for anything else.
 nonisolated enum AIProviderCatalog {
+    static let disabled = AIProviderDefinition(
+        key: "disabled",
+        name: "(Disabled)",
+        kind: .disabled,
+        defaultEndpoint: "",
+        chatPath: "",
+        modelsPath: nil,
+        auth: .none,
+        apiKeyOptional: true,
+        isRecommended: false,
+        isEndpointEditable: false
+    )
+
     static let onDevice = AIProviderDefinition(
         key: "apple_ondevice",
         name: "On-Device Apple Intelligence",
@@ -262,7 +277,7 @@ nonisolated enum AIProviderCatalog {
         anthropic, cohere, deepSeek, gitHub, google, groq, miniMax, mistral, openAI, openRouter, perplexity, scaleway,
     ]
 
-    static let all: [AIProviderDefinition] = [lmStudio, onDevice] + hostedCommercial + [custom]
+    static let all: [AIProviderDefinition] = [disabled, lmStudio, onDevice] + hostedCommercial + [custom]
 
     static func definition(for key: String) -> AIProviderDefinition? {
         all.first { $0.key == key }

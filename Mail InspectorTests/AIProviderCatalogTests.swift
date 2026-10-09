@@ -9,8 +9,9 @@ import Testing
 import Foundation
 @testable import Mail_Inspector
 
-/// Tests for `AIProviderCatalog`: every entry has a unique key, LM Studio sorts first and is
-/// marked recommended, On-Device has no network surface, and lookup by key works.
+/// Tests for `AIProviderCatalog`: every entry has a unique key, Disabled sorts first, LM Studio
+/// sorts right after it and is marked recommended, On-Device has no network surface, and lookup
+/// by key works.
 @Suite("AIProviderCatalog")
 struct AIProviderCatalogTests {
     @Test("Every provider has a unique key")
@@ -19,10 +20,16 @@ struct AIProviderCatalogTests {
         #expect(Set(keys).count == keys.count)
     }
 
-    @Test("LM Studio is first in the list and marked recommended")
-    func lmStudioIsFirstAndRecommended() throws {
-        #expect(AIProviderCatalog.all.first?.key == "lmstudio")
-        #expect(AIProviderCatalog.all.first?.isRecommended == true)
+    @Test("Disabled is first in the list")
+    func disabledIsFirst() throws {
+        #expect(AIProviderCatalog.all.first?.key == "disabled")
+        #expect(AIProviderCatalog.all.first?.kind == .disabled)
+    }
+
+    @Test("LM Studio is second in the list and marked recommended")
+    func lmStudioIsSecondAndRecommended() throws {
+        #expect(AIProviderCatalog.all.dropFirst().first?.key == "lmstudio")
+        #expect(AIProviderCatalog.all.dropFirst().first?.isRecommended == true)
     }
 
     @Test("On-Device Apple Intelligence has no endpoint, no editable endpoint, and no models path")

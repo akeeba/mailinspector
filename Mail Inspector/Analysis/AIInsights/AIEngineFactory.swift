@@ -29,6 +29,8 @@ enum AIEngineFactory {
     static func isActiveProviderReady(settings: InspectorSettings) -> Bool {
         guard let definition = AIProviderCatalog.definition(for: settings.aiActiveProviderKey) else { return false }
         switch definition.kind {
+        case .disabled:
+            return false
         case .onDevice:
             return AIInsightsAvailability.current == .available
         case .remote:
@@ -43,6 +45,9 @@ enum AIEngineFactory {
         }
 
         switch definition.kind {
+        case .disabled:
+            return .unavailable(reason: "AI analysis is turned off — pick a provider in Settings.")
+
         case .onDevice:
             if case .unavailable(let reason) = AIInsightsAvailability.current {
                 return .unavailable(reason: reason)

@@ -22,7 +22,9 @@ final class InspectorSettings {
     private static let showBrandImagesKey = "showBrandImages"
     private static let hideBrandImagesForMessagesWithoutSpamScoreKey = "hideBrandImagesForMessagesWithoutSpamScore"
     private static let hideBrandImagesAboveSpamThresholdKey = "hideBrandImagesAboveSpamThreshold"
-    private static let isAIInsightsEnabledKey = "isAIInsightsEnabled"
+    /// Read once at init for migration only — no longer written. Replaced by selecting
+    /// `AIProviderCatalog.disabled` as the active provider.
+    private static let legacyIsAIInsightsEnabledKey = "isAIInsightsEnabled"
     private static let allowIncludingMessageTextInAIChatKey = "allowIncludingMessageTextInAIChat"
     private static let aiActiveProviderKeyKey = "aiActiveProviderKey"
     private static let aiProviderEndpointsKey = "aiProviderEndpoints"
@@ -127,15 +129,11 @@ final class InspectorSettings {
     }
 
     /// Whether to analyze each message with AI (a legitimacy score, a short prose analysis, and
-    /// a follow-up chat), using whichever backend `aiActiveProviderKey` selects. On by default:
-    /// the default backend (On-Device Apple Intelligence) runs entirely on-device, so there's no
-    /// remote request to be cautious about there — just a result that, like any model output,
-    /// can be confidently wrong. Switching to a remote provider is a separate, explicit choice
-    /// (see `aiActiveProviderKey`), each with its own privacy disclosure in Settings.
+    /// a follow-up chat). Derived from `aiActiveProviderKey`: on for any real provider, off only
+    /// when `AIProviderCatalog.disabled` is selected — there's no separate on/off switch, "Off"
+    /// is just another entry in the Provider picker.
     var isAIInsightsEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(isAIInsightsEnabled, forKey: Self.isAIInsightsEnabledKey)
-        }
+        aiActiveProviderKey != AIProviderCatalog.disabled.key
     }
 
     /// Whether the AI chat is allowed to attach a decoded excerpt of the message's own text
@@ -150,11 +148,12 @@ final class InspectorSettings {
         }
     }
 
-    /// Which entry in `AIProviderCatalog` is active. Defaults to On-Device Apple Intelligence —
-    /// zero-config and already works for anyone who has it enabled. LM Studio is listed first in
-    /// the picker and marked "Recommended" (local, private, and far better at non-English text),
-    /// but switching to it — or to any other provider — is always an explicit choice, never
-    /// automatic. API keys are never stored here — see `AIKeychainStore`.
+    /// Which entry in `AIProviderCatalog` is active, including the `disabled` sentinel that turns
+    /// AI analysis off entirely. Defaults to On-Device Apple Intelligence — zero-config and
+    /// already works for anyone who has it enabled. LM Studio is listed second in the picker and
+    /// marked "Recommended" (local, private, and far better at non-English text), but switching
+    /// to it — or to any other provider — is always an explicit choice, never automatic. API keys
+    /// are never stored here — see `AIKeychainStore`.
     var aiActiveProviderKey: String {
         didSet {
             UserDefaults.standard.set(aiActiveProviderKey, forKey: Self.aiActiveProviderKeyKey)
@@ -211,9 +210,16 @@ final class InspectorSettings {
         showBrandImages = UserDefaults.standard.object(forKey: Self.showBrandImagesKey) as? Bool ?? false
         hideBrandImagesForMessagesWithoutSpamScore = UserDefaults.standard.object(forKey: Self.hideBrandImagesForMessagesWithoutSpamScoreKey) as? Bool ?? true
         hideBrandImagesAboveSpamThreshold = UserDefaults.standard.object(forKey: Self.hideBrandImagesAboveSpamThresholdKey) as? Double ?? 25
-        isAIInsightsEnabled = UserDefaults.standard.object(forKey: Self.isAIInsightsEnabledKey) as? Bool ?? true
         allowIncludingMessageTextInAIChat = UserDefaults.standard.object(forKey: Self.allowIncludingMessageTextInAIChatKey) as? Bool ?? false
-        aiActiveProviderKey = UserDefaults.standard.string(forKey: Self.aiActiveProviderKeyKey) ?? AIProviderCatalog.onDevice.key
+        if let storedProviderKey = UserDefaults.standard.string(forKey: Self.aiActiveProviderKeyKey) {
+            aiActiveProviderKey = storedProviderKey
+        } else if UserDefaults.standard.object(forKey: Self.legacyIsAIInsightsEnabledKey) as? Bool == false {
+            // Migrates a pre-provider-picker install that had the old "Analyze messages with
+            // AI" toggle switched off into the equivalent `disabled` provider selection.
+            aiActiveProviderKey = AIProviderCatalog.disabled.key
+        } else {
+            aiActiveProviderKey = AIProviderCatalog.onDevice.key
+        }
         aiProviderEndpoints = UserDefaults.standard.dictionary(forKey: Self.aiProviderEndpointsKey) as? [String: String] ?? [:]
         aiProviderModelNames = UserDefaults.standard.dictionary(forKey: Self.aiProviderModelNamesKey) as? [String: String] ?? [:]
         trustedReplyToDomainsBySender = UserDefaults.standard.dictionary(forKey: Self.trustedReplyToDomainsBySenderKey) as? [String: [String]] ?? [:]
