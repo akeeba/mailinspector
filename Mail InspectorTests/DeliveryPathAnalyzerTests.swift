@@ -88,6 +88,14 @@ struct DeliveryPathAnalyzerTests {
         #expect(flag?.severity == .notable)
     }
 
+    @Test("Does not flag a Microsoft/Exchange-style hop whose from-clause parenthetical is just the sending IP, not a reverse-DNS hostname")
+    func bareIPParentheticalIsNotFlaggedAsAMismatch() throws {
+        let raw = "Received: from bg-d.cloudflare-smtp.com (104.30.16.3) by MAD0EPF000008C4.mail.protection.outlook.com (10.167.241.200) with Microsoft SMTP Server (version=TLS1_3, cipher=TLS_AES_256_GCM_SHA384) id 15.21.472.14 via Frontend Transport; Wed, 30 Sep 2026 11:30:36 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
+        #expect(analysis.hops[0].flags.isEmpty)
+    }
+
     @Test("Flags a claimed hostname that contradicts reverse DNS as a warning — this is the genuinely forged-looking case")
     func forgedLookingHostnameMismatchIsAWarning() throws {
         let raw = "Received: from totally-different.example (actual-ptr.evil.example [203.0.113.5]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"

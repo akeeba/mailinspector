@@ -85,6 +85,16 @@ struct ReceivedHeaderParserTests {
         #expect(hop.parseWarnings.contains { $0.contains("timestamp") })
     }
 
+    @Test("Treats a bare IP in parentheses (Microsoft/Exchange style) as the sending IP, not a mismatched reverse-DNS hostname")
+    func bareIPInParenthesesIsTheIPNotAVerifiedHostname() throws {
+        let raw = "Received: from bg-d.cloudflare-smtp.com (104.30.16.3) by MAD0EPF000008C4.mail.protection.outlook.com (10.167.241.200) with Microsoft SMTP Server (version=TLS1_3, cipher=TLS_AES_256_GCM_SHA384) id 15.21.472.14 via Frontend Transport; Wed, 30 Sep 2026 11:30:36 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let hop = ReceivedHeaderParser.parseAll(from: message.parsed)[0]
+        #expect(hop.claimedFromHostname == "bg-d.cloudflare-smtp.com")
+        #expect(hop.fromIPAddress == "104.30.16.3")
+        #expect(hop.verifiedFromHostname == nil)
+    }
+
     @Test("Does not merge an unrelated second parenthetical (e.g. a TLS-info remark) into the reverse-DNS hostname")
     func secondUnrelatedParentheticalIsNotMergedIntoVerifiedHostname() throws {
         let raw = "Received: from mx2.mailbox.org ([2001:67c:2050:104:0:2:25:2])\r\n" +

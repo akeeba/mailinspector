@@ -192,7 +192,17 @@ nonisolated enum ReceivedHeaderParser {
     private static func parseParenthetical(_ inner: String) -> (verified: String?, ip: String?) {
         guard let ip = extractBracketedAddress(inner) else {
             let trimmed = inner.trimmingCharacters(in: .whitespaces)
-            return (trimmed.isEmpty ? nil : trimmed, nil)
+            guard !trimmed.isEmpty else { return (nil, nil) }
+            // Microsoft/Exchange-style headers annotate the from-clause with the sending host's
+            // bare IP in parentheses — e.g. "from host.example (10.1.2.3) by ..." — instead of
+            // Postfix's bracketed "(verified [ip])" reverse-DNS remark. A bare IP here is not a
+            // reverse-DNS verification result at all, so treating it as the verified hostname
+            // produced a false "claimed hostname doesn't match reverse DNS" warning on every hop
+            // of this shape.
+            if IPAddressClassifier.classify(trimmed) != nil {
+                return (nil, trimmed)
+            }
+            return (trimmed, nil)
         }
         let withoutBracket = inner
             .replacingOccurrences(of: "[\(ip)]", with: "")
