@@ -12,6 +12,7 @@ import AppKit
 struct RawHeadersView: View {
     let message: EmailMessage
     @State private var searchText = ""
+    @State private var isExpanded = false
 
     private var filteredHeaders: [HeaderField] {
         guard !searchText.isEmpty else { return message.parsed.headers }
@@ -22,7 +23,24 @@ struct RawHeadersView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                if message.parsed.headers.isEmpty {
+                    Text("This message has no headers.")
+                        .foregroundStyle(.secondary)
+                } else if filteredHeaders.isEmpty {
+                    Text("No headers match “\(searchText)”.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(filteredHeaders) { field in
+                            HeaderFieldRow(field: field)
+                        }
+                    }
+                }
+            }
+            .padding(.top, 6)
+        } label: {
             HStack {
                 Text("Raw Headers")
                     .font(.headline)
@@ -32,21 +50,8 @@ struct RawHeadersView: View {
                 } label: {
                     Label("Copy All", systemImage: "doc.on.doc")
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Copy all headers to the clipboard")
-            }
-
-            if message.parsed.headers.isEmpty {
-                Text("This message has no headers.")
-                    .foregroundStyle(.secondary)
-            } else if filteredHeaders.isEmpty {
-                Text("No headers match “\(searchText)”.")
-                    .foregroundStyle(.secondary)
-            } else {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    ForEach(filteredHeaders) { field in
-                        HeaderFieldRow(field: field)
-                    }
-                }
             }
         }
         .searchable(text: $searchText, prompt: "Search headers")
