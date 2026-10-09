@@ -73,5 +73,14 @@ protocol AIAnalysisEngine: AnyObject {
     /// needing to know which kind of increment it originally was.
     func streamRespond(prompt: String) -> AsyncThrowingStream<String, Error>
 
+    /// The model names this engine's configured provider currently offers, for a "Fetch Models"
+    /// button in Settings — only meaningful when `capabilities.supportsModelListing` is true.
+    /// Default implementation (used by engines that don't support this) returns an empty list.
+    func listAvailableModels() async throws -> [String]
+
     var capabilities: AIEngineCapabilities { get }
+}
+
+extension AIAnalysisEngine {
+    func listAvailableModels() async throws -> [String] { [] }
 }

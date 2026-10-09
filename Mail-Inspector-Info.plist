@@ -19,5 +19,12 @@
 	</array>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Mail Inspector can analyze messages using a locally-hosted AI model (such as LM Studio) on your Mac or local network, if you configure one in Settings.</string>
 </dict>
 </plist>

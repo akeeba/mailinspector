@@ -24,6 +24,9 @@ final class InspectorSettings {
     private static let hideBrandImagesAboveSpamThresholdKey = "hideBrandImagesAboveSpamThreshold"
     private static let isAIInsightsEnabledKey = "isAIInsightsEnabled"
     private static let allowIncludingMessageTextInAIChatKey = "allowIncludingMessageTextInAIChat"
+    private static let aiActiveProviderKeyKey = "aiActiveProviderKey"
+    private static let aiProviderEndpointsKey = "aiProviderEndpoints"
+    private static let aiProviderModelNamesKey = "aiProviderModelNames"
 
     var maxMessageSizeBytes: Int = InspectorSettings.defaultMaxMessageSizeBytes
 
@@ -121,26 +124,53 @@ final class InspectorSettings {
         }
     }
 
-    /// Whether to analyze each message with Apple's on-device Apple Intelligence model (a
-    /// legitimacy score, a short prose analysis, and a follow-up chat), when it's available —
-    /// macOS 27+ with Apple Intelligence enabled on eligible hardware. On by default: all of
-    /// this runs entirely on-device, so unlike this app's one network-touching feature (brand
-    /// images), there's no remote request to be cautious about, just a result that — like any
-    /// model output — can be confidently wrong.
+    /// Whether to analyze each message with AI (a legitimacy score, a short prose analysis, and
+    /// a follow-up chat), using whichever backend `aiActiveProviderKey` selects. On by default:
+    /// the default backend (On-Device Apple Intelligence) runs entirely on-device, so there's no
+    /// remote request to be cautious about there — just a result that, like any model output,
+    /// can be confidently wrong. Switching to a remote provider is a separate, explicit choice
+    /// (see `aiActiveProviderKey`), each with its own privacy disclosure in Settings.
     var isAIInsightsEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isAIInsightsEnabled, forKey: Self.isAIInsightsEnabledKey)
         }
     }
 
-    /// Whether the Apple Intelligence chat is allowed to attach a decoded excerpt of the
-    /// message's own text content to a question, when the user explicitly asks it to. Off by
-    /// default: the body is otherwise never decoded anywhere in this app, the excerpt is raw
-    /// (not MIME-aware, so it can look like encoded gibberish for most real-world messages), and
-    /// attacker-controlled text is a real prompt-injection surface even when processed on-device.
+    /// Whether the AI chat is allowed to attach a decoded excerpt of the message's own text
+    /// content to a question, when the user explicitly asks it to. Off by default: the body is
+    /// otherwise never decoded anywhere in this app, the excerpt is raw (not MIME-aware, so it
+    /// can look like encoded gibberish for most real-world messages), and attacker-controlled
+    /// text is a real prompt-injection surface — doubly so once it may be sent to a remote
+    /// provider rather than staying on-device.
     var allowIncludingMessageTextInAIChat: Bool {
         didSet {
             UserDefaults.standard.set(allowIncludingMessageTextInAIChat, forKey: Self.allowIncludingMessageTextInAIChatKey)
+        }
+    }
+
+    /// Which entry in `AIProviderCatalog` is active. Defaults to On-Device Apple Intelligence —
+    /// zero-config and already works for anyone who has it enabled. LM Studio is listed first in
+    /// the picker and marked "Recommended" (local, private, and far better at non-English text),
+    /// but switching to it — or to any other provider — is always an explicit choice, never
+    /// automatic. API keys are never stored here — see `AIKeychainStore`.
+    var aiActiveProviderKey: String {
+        didSet {
+            UserDefaults.standard.set(aiActiveProviderKey, forKey: Self.aiActiveProviderKeyKey)
+        }
+    }
+
+    /// Remembers each provider's endpoint URL across switches, so going back to a previously
+    /// configured provider doesn't require retyping it. Not a secret — just a server address.
+    var aiProviderEndpoints: [String: String] {
+        didSet {
+            UserDefaults.standard.set(aiProviderEndpoints, forKey: Self.aiProviderEndpointsKey)
+        }
+    }
+
+    /// Remembers each provider's chosen model name across switches. Not a secret.
+    var aiProviderModelNames: [String: String] {
+        didSet {
+            UserDefaults.standard.set(aiProviderModelNames, forKey: Self.aiProviderModelNamesKey)
         }
     }
 
@@ -157,5 +187,8 @@ final class InspectorSettings {
         hideBrandImagesAboveSpamThreshold = UserDefaults.standard.object(forKey: Self.hideBrandImagesAboveSpamThresholdKey) as? Double ?? 25
         isAIInsightsEnabled = UserDefaults.standard.object(forKey: Self.isAIInsightsEnabledKey) as? Bool ?? true
         allowIncludingMessageTextInAIChat = UserDefaults.standard.object(forKey: Self.allowIncludingMessageTextInAIChatKey) as? Bool ?? false
+        aiActiveProviderKey = UserDefaults.standard.string(forKey: Self.aiActiveProviderKeyKey) ?? AIProviderCatalog.onDevice.key
+        aiProviderEndpoints = UserDefaults.standard.dictionary(forKey: Self.aiProviderEndpointsKey) as? [String: String] ?? [:]
+        aiProviderModelNames = UserDefaults.standard.dictionary(forKey: Self.aiProviderModelNamesKey) as? [String: String] ?? [:]
     }
 }

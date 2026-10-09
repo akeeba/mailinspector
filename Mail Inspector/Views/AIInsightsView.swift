@@ -22,20 +22,27 @@ struct AIInsightsView: View {
     let allowIncludingMessageTextInChat: Bool
 
     @Environment(AIInsightsSessionCache.self) private var sessionCache
+    @Environment(InspectorSettings.self) private var settings
     @State private var chatInput = ""
     @State private var includeMessageTextNextSend = false
 
+    private var providerDisplayName: String {
+        AIProviderCatalog.definition(for: settings.aiActiveProviderKey)?.name ?? "AI"
+    }
+
+    private var engineAvailability: AIEngineAvailability {
+        AIEngineFactory.resolveActiveEngine(settings: settings, systemPrompt: MessageInsightsSession.instructions)
+    }
+
     /// Looked up (or created, on first access) through the shared cache, keyed by message id —
     /// this is what makes the score/analysis/chat survive switching to another message and back.
-    /// `nil` only when no backend is currently usable (e.g. Apple Intelligence not enabled, no
-    /// other provider configured).
+    /// `nil` only when no backend is currently usable (not configured, Apple Intelligence not
+    /// enabled, missing endpoint/key/model, …).
     private var session: MessageInsightsSession? {
         if let existing = sessionCache.existingSession(for: message.id) {
             return existing
         }
-        guard let engine = AIEngineFactory.makeActiveEngine(systemPrompt: MessageInsightsSession.instructions) else {
-            return nil
-        }
+        guard case .ready(let engine) = engineAvailability else { return nil }
         let summary = EmailSignalsSummary.build(
             message: message,
             authentication: authentication,
@@ -48,20 +55,15 @@ struct AIInsightsView: View {
         }
     }
 
-    private var unavailableReason: String {
-        if case .unavailable(let reason) = AIInsightsAvailability.current { return reason }
-        return "No AI backend is currently available."
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Apple Intelligence Analysis")
+            Text("\(providerDisplayName) Analysis")
                 .font(.headline)
 
             if let session {
                 content(session: session)
-            } else {
-                AIInsightsUnavailableView(reason: unavailableReason)
+            } else if case .unavailable(let reason) = engineAvailability {
+                AIInsightsUnavailableView(reason: reason)
             }
         }
         .task(id: message.id) {
@@ -76,7 +78,7 @@ struct AIInsightsView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Analyzing with Apple Intelligence…")
+                    Text("Analyzing with \(providerDisplayName)…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

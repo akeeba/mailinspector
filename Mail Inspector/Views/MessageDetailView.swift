@@ -84,18 +84,18 @@ struct MessageDetailView: View {
     /// `@Observable` session, however it was obtained.
     private var aiLegitimacyScore: Int? {
         guard settings.isAIInsightsEnabled else { return nil }
-        guard case .available = AIInsightsAvailability.current else { return nil }
+        guard AIEngineFactory.isActiveProviderReady(settings: settings) else { return nil }
         return aiInsightsSessionCache.existingSession(for: message.id)?.assessment?.score
     }
 
-    /// True once the feature is on and available, as long as there's no score yet and no
-    /// failure — covers both "the session hasn't been created yet" (it will be, momentarily,
-    /// once `AIInsightsView` appears below) and "it exists but the score is still generating",
-    /// so the summary block can show a spinner immediately rather than waiting for
+    /// True once the feature is on and the active provider is ready, as long as there's no score
+    /// yet and no failure — covers both "the session hasn't been created yet" (it will be,
+    /// momentarily, once `AIInsightsView` appears below) and "it exists but the score is still
+    /// generating", so the summary block can show a spinner immediately rather than waiting for
     /// `AIInsightsView` to mount first.
     private var aiScoreIsPending: Bool {
         guard settings.isAIInsightsEnabled else { return false }
-        guard case .available = AIInsightsAvailability.current else { return false }
+        guard AIEngineFactory.isActiveProviderReady(settings: settings) else { return false }
         guard let session = aiInsightsSessionCache.existingSession(for: message.id) else {
             return true
         }

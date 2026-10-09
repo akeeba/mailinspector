@@ -109,15 +109,3 @@ final class OnDeviceAIEngine: AIAnalysisEngine {
         }
     }
 }
-
-/// Decides which engine should actually be used right now. Carries no `@available` annotation
-/// itself — like `AIInsightsAvailability`, it guards its one macOS-27-only reference internally
-/// — so call sites never need their own `if #available` just to ask "what should I use?"
-enum AIEngineFactory {
-    static func makeActiveEngine(systemPrompt: String) -> (any AIAnalysisEngine)? {
-        guard #available(macOS 27, *), AIInsightsAvailability.current == .available else {
-            return nil
-        }
-        return OnDeviceAIEngine(systemPrompt: systemPrompt)
-    }
-}
