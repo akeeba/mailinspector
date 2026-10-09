@@ -32,6 +32,11 @@ nonisolated struct ParsedReceivedHeader: Sendable {
 /// so real-world headers vary; this extracts what it can and leaves the rest nil rather than
 /// failing outright.
 nonisolated enum ReceivedHeaderParser {
+    /// The exact text of the "no from clause" parse warning, exposed so callers (specifically
+    /// `DeliveryPathAnalyzer`, for its final-hop exception) can recognize this particular warning
+    /// without resorting to fragile substring matching.
+    static let missingFromClauseWarning = "This header has no \u{201c}from\u{201d} clause."
+
     static func parseAll(from parsed: ParsedEmail) -> [ParsedReceivedHeader] {
         parsed.headers(named: "Received").map(parse)
     }
@@ -57,7 +62,7 @@ nonisolated enum ReceivedHeaderParser {
         }
 
         if segments["from"] == nil {
-            warnings.append("This header has no \u{201c}from\u{201d} clause.")
+            warnings.append(missingFromClauseWarning)
         }
 
         return ParsedReceivedHeader(

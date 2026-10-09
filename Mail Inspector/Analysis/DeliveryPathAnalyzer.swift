@@ -55,10 +55,22 @@ nonisolated enum DeliveryPathAnalyzer {
                 nextFlagID += 1
             }
 
+            // The newest (last) hop is often the recipient's own infrastructure finishing local
+            // delivery — e.g. "Received: by mx.example.com (Postfix, from userid 494) id ...;
+            // date" — which has no "from" clause at all because nothing was received *from*
+            // another server. That's just how local delivery looks, not a parsing anomaly or an
+            // unresolved/forged hostname, so this specific shape is never flagged.
+            let isFinalLocalDeliveryHop = index == parsedOldestFirst.count - 1
+                && parsedHop.claimedFromHostname == nil
+                && parsedHop.fromIPAddress == nil
+
             // Parser-level issues (missing "from" clause, unparseable timestamp) are about the
             // header's shape, not evidence of anything — most real-world headers that trip these
             // are just unusual MTA formatting, not forgery.
             for warning in parsedHop.parseWarnings {
+                if isFinalLocalDeliveryHop, warning == ReceivedHeaderParser.missingFromClauseWarning {
+                    continue
+                }
                 addFlag(.notable, warning)
             }
 
@@ -74,17 +86,19 @@ nonisolated enum DeliveryPathAnalyzer {
                 hasSeenPublicAddress = true
             }
 
-            if let claimed = parsedHop.claimedFromHostname, let verified = parsedHop.verifiedFromHostname,
-               verified.caseInsensitiveCompare("unknown") != .orderedSame,
-               claimed.caseInsensitiveCompare(verified) != .orderedSame,
-               !claimed.contains(verified), !verified.contains(claimed) {
-                // The claimed hostname actively contradicts what reverse DNS found — this is the
-                // "obviously forged" case, a genuine warning.
-                addFlag(.warning, "Claimed sending hostname \u{201c}\(claimed)\u{201d} does not match \u{201c}\(verified)\u{201d}, which the receiving server found via reverse DNS.")
-            } else if parsedHop.verifiedFromHostname?.caseInsensitiveCompare("unknown") == .orderedSame {
-                // An unresolvable reverse DNS lookup is extremely common for internal SaaS
-                // infrastructure and tells you nothing by itself — a notice, not a warning.
-                addFlag(.notable, "The receiving server could not verify the sending hostname via reverse DNS.")
+            if !isFinalLocalDeliveryHop {
+                if let claimed = parsedHop.claimedFromHostname, let verified = parsedHop.verifiedFromHostname,
+                   verified.caseInsensitiveCompare("unknown") != .orderedSame,
+                   claimed.caseInsensitiveCompare(verified) != .orderedSame,
+                   !claimed.contains(verified), !verified.contains(claimed) {
+                    // The claimed hostname actively contradicts what reverse DNS found — this is
+                    // the "obviously forged" case, a genuine warning.
+                    addFlag(.warning, "Claimed sending hostname \u{201c}\(claimed)\u{201d} does not match \u{201c}\(verified)\u{201d}, which the receiving server found via reverse DNS.")
+                } else if parsedHop.verifiedFromHostname?.caseInsensitiveCompare("unknown") == .orderedSame {
+                    // An unresolvable reverse DNS lookup is extremely common for internal SaaS
+                    // infrastructure and tells you nothing by itself — a notice, not a warning.
+                    addFlag(.notable, "The receiving server could not verify the sending hostname via reverse DNS.")
+                }
             }
 
             if index > 0, let previousTimestamp = parsedOldestFirst[index - 1].timestamp, let timestamp = parsedHop.timestamp {

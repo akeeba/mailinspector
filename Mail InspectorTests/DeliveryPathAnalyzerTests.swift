@@ -98,6 +98,32 @@ struct DeliveryPathAnalyzerTests {
         #expect(flag?.severity == .warning)
     }
 
+    @Test("Does not flag the final hop's missing \"from\" clause when it's the recipient's own local delivery step, not a relay")
+    func finalLocalDeliveryHopIsNotFlaggedForMissingFromClause() throws {
+        // Received headers are newest-first in raw text; this "by"-only header (no "from") is
+        // topmost, so after reversal it becomes the *last*, newest hop — exactly the shape of a
+        // recipient's own local delivery step (e.g. Postfix handing off to the mailbox), not
+        // something received from another server.
+        let raw = "Received: by mx.recipient.example (Postfix, from userid 494) id ABC123; Mon, 2 Jan 2006 15:05:00 +0000\r\n" +
+            "Received: from sender.example (sender.example [203.0.113.5]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
+        #expect(analysis.hops.count == 2)
+        #expect(analysis.hops[1].claimedFromHostname == nil)
+        #expect(analysis.hops[1].flags.isEmpty)
+    }
+
+    @Test("Still flags a missing \"from\" clause on a by-only hop that isn't the final one")
+    func nonFinalByOnlyHopIsStillFlagged() throws {
+        let raw = "Received: from final.example by last.example; Mon, 2 Jan 2006 15:06:00 +0000\r\n" +
+            "Received: by intermediate.example id XYZ789; Mon, 2 Jan 2006 15:05:00 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [])
+        #expect(analysis.hops.count == 2)
+        let flag = analysis.hops[0].flags.first { $0.message.contains("from") && $0.message.contains("clause") }
+        #expect(flag != nil)
+    }
+
     @Test("Marks only the trusted suffix of hops as trusted, stopping at the first non-matching hop")
     func marksTrustBoundary() throws {
         let raw = "Received: from upstream.example by mx.ourcompany.com; Wed, 4 Jan 2006 00:00:00 +0000\r\n" +
