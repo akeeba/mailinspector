@@ -17,9 +17,11 @@ nonisolated enum AuthenticationVerdict: String, Sendable {
 /// relays can inject arbitrary `Authentication-Results` headers before the message reaches the
 /// receiving server, the receiving infrastructure must strip or disregard any such header that
 /// didn't genuinely come from itself. This app has no way to verify that server-side behavior;
-/// `isTrusted` only reflects that the `authserv-id` string matches something the user configured
-/// in Settings, nothing more. That caveat is why even "trusted" results are never shown with an
-/// unqualified "Pass" — see `AuthenticationView`.
+/// `isTrusted` reflects either that the `authserv-id` string matches something the user
+/// explicitly configured in Settings, or that `trustAllAuthenticationResultsByDefault` is on
+/// (the default) and every report is treated as trusted. Neither is proof of authenticity. That
+/// caveat is why even "trusted" results are never shown with an unqualified "Pass" — see
+/// `AuthenticationView`.
 nonisolated struct AttributedAuthResult: Sendable, Identifiable {
     let id: Int
     let authServID: String
@@ -66,7 +68,11 @@ nonisolated struct AuthenticationAnalysis: Sendable {
 /// (no DNS queries, no signature cryptography). A "Pass" anywhere in this analysis means "a
 /// server reported a pass", not "this app independently verified a pass".
 nonisolated enum AuthenticationAnalyzer {
-    static func analyze(message: EmailMessage, trustedAuthServIDs: [String]) -> AuthenticationAnalysis {
+    static func analyze(
+        message: EmailMessage,
+        trustedAuthServIDs: [String],
+        trustAllByDefault: Bool = false
+    ) -> AuthenticationAnalysis {
         let headers = AuthenticationResultsParser.parseAll(from: message.parsed)
         let dkimSignatures = DKIMSignatureParser.parseAll(from: message.parsed)
         let trusted = Set(trustedAuthServIDs.map { $0.lowercased() })
@@ -75,7 +81,7 @@ nonisolated enum AuthenticationAnalyzer {
             var items: [AttributedAuthResult] = []
             var nextID = 0
             for header in headers {
-                let isTrusted = trusted.contains(header.authServID.lowercased())
+                let isTrusted = trustAllByDefault || trusted.contains(header.authServID.lowercased())
                 for result in header.results where result.method == method {
                     items.append(AttributedAuthResult(id: nextID, authServID: header.authServID, result: result, isTrusted: isTrusted))
                     nextID += 1

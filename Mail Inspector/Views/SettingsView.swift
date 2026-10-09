@@ -8,8 +8,20 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
+                Toggle("Trust all Authentication-Results reports by default", isOn: Binding(
+                    get: { settings.trustAllAuthenticationResultsByDefault },
+                    set: { settings.trustAllAuthenticationResultsByDefault = $0 }
+                ))
+            } footer: {
+                Text("When on, every Authentication-Results header is shown as a trusted report, regardless of which server added it. Turn this off to require explicitly trusting each authserv-id below instead — useful if you want to be certain only servers you've vetted drive the Pass/Fail verdicts you see.")
+                    .font(.caption)
+            }
+
+            Section {
                 if settings.trustedAuthServIDs.isEmpty {
-                    Text("No trusted servers configured. Authentication results will be shown as Unknown until you add one.")
+                    Text(settings.trustAllAuthenticationResultsByDefault
+                        ? "Not used while \"Trust all Authentication-Results reports by default\" is on."
+                        : "No trusted servers configured. Authentication results will be shown as Unknown until you add one.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -75,12 +87,24 @@ struct SettingsView: View {
             } header: {
                 Text("Domain Alignment Data")
             } footer: {
-                Text("This is the only network request Mail Inspector ever makes: a weekly download of the public suffix list from publicsuffix.org, used to tell a subdomain (e.g. ministry.gov.gr) apart from an unrelated domain when checking DMARC alignment. No message content, addresses, or any other data is sent. Turning this off keeps the app fully offline and falls back to a small bundled list that covers fewer suffixes correctly.")
+                Text("A weekly download of the public suffix list from publicsuffix.org, used to tell a subdomain (e.g. ministry.gov.gr) apart from an unrelated domain when checking DMARC alignment. No message content, addresses, or any other data is sent. Turning this off keeps the app fully offline and falls back to a small bundled list that covers fewer suffixes correctly.")
+                    .font(.caption)
+            }
+
+            Section {
+                Toggle("Trust server spam headers", isOn: Binding(
+                    get: { settings.trustServerSpamHeaders },
+                    set: { settings.trustServerSpamHeaders = $0 }
+                ))
+            } header: {
+                Text("Spam Filtering")
+            } footer: {
+                Text("When on, a message's spam-filter headers (X-Spam-Score, Exchange's Spam Confidence Level, etc.) are shown as a likelihood gauge. Off by default: unlike SPF/DKIM/DMARC these headers follow no standard, their scoring is entirely filter-specific, and the gauge only rescales a number a filter already reported — it's never something this app determined independently.")
                     .font(.caption)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 560)
+        .frame(width: 460, height: 760)
     }
 
     private func addAuthServID() {

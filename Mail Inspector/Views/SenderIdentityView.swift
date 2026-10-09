@@ -10,11 +10,6 @@ struct SenderIdentityView: View {
             Text("Sender Identity")
                 .font(.headline)
 
-            if message.fromHeaderCount > 1 {
-                Label("This message has \(message.fromHeaderCount) From headers, which is invalid and often a sign of forgery.", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-            }
-
             if let from = message.primaryFrom {
                 VStack(alignment: .leading, spacing: 4) {
                     if let displayName = from.displayName, !displayName.isEmpty {

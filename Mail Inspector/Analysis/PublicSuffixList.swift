@@ -6,10 +6,11 @@ import Foundation
 /// multi-label suffixes (e.g. `gov.gr`, `gov.cy`) — the real list has several thousand entries
 /// and changes over time, so this downloads and caches it instead of guessing.
 ///
-/// **This is the only network request Mail Inspector ever makes**, and only when enabled in
-/// Settings (`InspectorSettings.isPublicSuffixListUpdateEnabled`, on by default). The request is
-/// a single `GET` to a fixed, well-known URL — no message content, addresses, or any other data
-/// is ever sent. The list is cached to disk and refreshed at most once a week; `refreshIfNeeded`
+/// **This is one of only two network requests Mail Inspector ever makes** (the other being the
+/// manually-triggered SPF recheck in `SPFEvaluator`), and only when enabled in Settings
+/// (`InspectorSettings.isPublicSuffixListUpdateEnabled`, on by default). The request is a single
+/// `GET` to a fixed, well-known URL — no message content, addresses, or any other data is ever
+/// sent. The list is cached to disk and refreshed at most once a week; `refreshIfNeeded`
 /// is safe to call on every launch, since it does nothing at all (no network access) while the
 /// cache is still fresh. When offline, disabled, or before the first successful download, a
 /// small bundled fallback list covers the most common cases so domain alignment still works

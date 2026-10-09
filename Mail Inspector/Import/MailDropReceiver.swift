@@ -26,17 +26,25 @@ struct DroppedItem: Sendable {
 /// `NSWindowDelegate` call to whatever delegate SwiftUI already installed, to avoid breaking
 /// window lifecycle behavior SwiftUI relies on.
 ///
-/// **Known macOS limitation, confirmed by hands-on testing:** dragging a message directly from
-/// Apple Mail's list onto *any* third-party application window — this one included, regardless
-/// of which drag-destination mechanism is used — never even reaches `draggingEntered`. The same
-/// message dragged onto the Finder desktop successfully materializes a `.eml` file there, and
-/// that resulting file drags onto this window's `DropZoneView` without issue, which rules out a
-/// registration bug here: Mail's drag source simply does not complete promise drags against
-/// arbitrary application windows on this macOS version, only against Finder/Dock. Dragging the
-/// same message onto this app's **Dock icon**, however, does work (routed through
-/// `AppDelegate.application(_:open:)` and `PendingImportQueue`, not this file at all) — that is
-/// the supported way to hand this app a Mail message without opening it, and `DropZoneView`'s
-/// copy says so.
+/// **Known macOS limitation, confirmed by hands-on testing — twice, with two different
+/// destination mechanisms and two different registered-type sets:** dragging a message directly
+/// from Apple Mail's list onto *any* third-party application window — this one included — never
+/// even reaches `draggingEntered`. This was first confirmed registering only
+/// `NSFilePromiseReceiver`'s types + `.fileURL`; dragging the same message into Notes/TextEdit/
+/// Calendar/Reminders was later found to insert a `message:<id>` URL, proving Mail's drag source
+/// does vend *something* generically droppable — so the types above were broadened to add `.URL`
+/// and `.string` and retested, and `draggingEntered` *still* never fired. That rules out "wrong
+/// pasteboard type" as the explanation. The most plausible remaining explanation: Mail's drag
+/// source special-cases which destinations it considers valid (an allowlist of first-party Apple
+/// app bundle IDs, or a private entitlement), which a third-party app has no way to obtain. The
+/// same message dragged onto the Finder desktop successfully materializes a `.eml` file there,
+/// and that resulting file drags onto this window's `DropZoneView` without issue, which rules out
+/// a registration bug on our side generally. Dragging the same message onto this app's **Dock
+/// icon**, however, does work (routed through `AppDelegate.application(_:open:)` and
+/// `PendingImportQueue`, not this file at all) — that is the supported way to hand this app a
+/// Mail message without opening it, and `DropZoneView`'s copy says so. Do not re-attempt a
+/// types-based fix here without genuinely new information (e.g. a macOS update) — this has been
+/// investigated thoroughly, not guessed at.
 struct MailDropReceiver: NSViewRepresentable {
     var onReceiveItems: ([DroppedItem]) -> Void
     var onDraggingStateChanged: (Bool) -> Void = { _ in }

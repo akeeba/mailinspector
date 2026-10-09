@@ -6,6 +6,7 @@ import SwiftUI
 /// method, and even a trusted "Pass" only means a trusted server reported that one check passed.
 struct AuthenticationView: View {
     let analysis: AuthenticationAnalysis
+    let spfRecheckTarget: SPFRecheckTarget?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -17,9 +18,9 @@ struct AuthenticationView: View {
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 8) {
-                MethodResultRow(summary: analysis.spf)
-                MethodResultRow(summary: analysis.dkim)
-                MethodResultRow(summary: analysis.dmarc)
+                MethodResultRow(summary: analysis.spf, spfRecheckTarget: spfRecheckTarget)
+                MethodResultRow(summary: analysis.dkim, spfRecheckTarget: nil)
+                MethodResultRow(summary: analysis.dmarc, spfRecheckTarget: nil)
             }
 
             if analysis.alignment.fromDomain != nil {
@@ -87,6 +88,7 @@ private extension AuthenticationVerdict {
 
 private struct MethodResultRow: View {
     let summary: MethodAuthenticationSummary
+    let spfRecheckTarget: SPFRecheckTarget?
     @State private var isExpanded = false
 
     var body: some View {
@@ -102,6 +104,10 @@ private struct MethodResultRow: View {
                 }
                 ForEach(summary.unverifiedResults) { attributed in
                     AttributedResultRow(attributed: attributed, label: "Unverified report")
+                }
+                if let spfRecheckTarget {
+                    Divider()
+                    SPFRecheckView(target: spfRecheckTarget)
                 }
             }
             .padding(.top, 6)
@@ -271,6 +277,86 @@ private struct DKIMSignatureRow: View {
             Text(value)
                 .font(.system(.caption, design: .monospaced))
                 .textSelection(.enabled)
+        }
+    }
+}
+
+/// A manual, on-demand SPF recheck against the record as it exists right now — not what was
+/// recorded when the message was sent. This is the one place in the app that performs live
+/// network verification rather than just parsing reported results, and it only ever runs when
+/// explicitly requested by clicking the button.
+private struct SPFRecheckView: View {
+    let target: SPFRecheckTarget
+    @State private var isChecking = false
+    @State private var outcome: SPFCheckResult?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Button(action: recheck) {
+                    if isChecking {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("Recheck SPF Now")
+                    }
+                }
+                .disabled(isChecking)
+                Text("for \(target.ip) against \(target.domain) (from \(target.source))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let outcome {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: symbolName(for: outcome.result))
+                        .foregroundStyle(tintColor(for: outcome.result))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(outcome.result.rawValue.capitalized)
+                            .font(.caption.weight(.semibold))
+                        Text(outcome.explanation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(caveat(for: outcome.result))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func recheck() {
+        isChecking = true
+        outcome = nil
+        Task {
+            let result = await SPFEvaluator.evaluate(ip: target.ip, senderDomain: target.domain)
+            outcome = result
+            isChecking = false
+        }
+    }
+
+    private func caveat(for result: SPFResult) -> String {
+        result == .pass
+            ? "This checks the record as it exists right now, not as it was when the message was sent. A pass is a reasonably strong signal the sending IP is currently authorized — but SPF records can change, so this doesn't retroactively prove anything about the past."
+            : "This checks the record as it exists right now, not as it was when the message was sent. A non-pass result here proves nothing about the past — the record may have changed since."
+    }
+
+    private func symbolName(for result: SPFResult) -> String {
+        switch result {
+        case .pass: return "checkmark.circle.fill"
+        case .fail: return "xmark.circle.fill"
+        case .softfail, .neutral, .none: return "exclamationmark.triangle.fill"
+        case .temperror, .permerror: return "questionmark.circle.fill"
+        }
+    }
+
+    private func tintColor(for result: SPFResult) -> Color {
+        switch result {
+        case .pass: return .green
+        case .fail: return .red
+        case .softfail, .neutral, .none: return .orange
+        case .temperror, .permerror: return .gray
         }
     }
 }

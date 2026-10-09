@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var isDropTargeted = false
     @Environment(InspectorSettings.self) private var settings
     @Environment(PendingImportQueue.self) private var pendingImports
+    @Environment(FileOpenRequest.self) private var fileOpenRequest
 
     private static var emlContentTypes: [UTType] {
         [UTType(filenameExtension: "eml") ?? .data]
@@ -16,9 +17,22 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(messages, selection: $selection) { message in
-                MessageRow(message: message)
-                    .tag(message.id)
+            List(selection: $selection) {
+                ForEach(messages) { message in
+                    MessageRow(message: message)
+                        .tag(message.id)
+                        .contextMenu {
+                            Button("Remove from List", role: .destructive) {
+                                remove(message.id)
+                            }
+                        }
+                }
+                .onDelete { offsets in
+                    for index in offsets { remove(messages[index].id) }
+                }
+            }
+            .onDeleteCommand {
+                if let selection { remove(selection) }
             }
             .navigationTitle("Messages")
             .overlay {
@@ -39,13 +53,23 @@ struct ContentView: View {
                     }
                 }
             }
+            .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
+                handleItemProviders(providers)
+                return true
+            }
         } detail: {
-            if let selection, let message = messages.first(where: { $0.id == selection }) {
-                MessageDetailView(message: message)
-            } else if messages.isEmpty {
-                DropZoneView(onImportURLs: { importItems($0.map { DroppedItem(url: $0, isTemporary: false) }) }, onOpenFile: { isImporterPresented = true })
-            } else {
-                ContentUnavailableView("Select a Message", systemImage: "envelope")
+            Group {
+                if let selection, let message = messages.first(where: { $0.id == selection }) {
+                    MessageDetailView(message: message)
+                } else if messages.isEmpty {
+                    DropZoneView(onImportURLs: { importItems($0.map { DroppedItem(url: $0, isTemporary: false) }) }, onOpenFile: { isImporterPresented = true })
+                } else {
+                    ContentUnavailableView("Select a Message", systemImage: "envelope")
+                }
+            }
+            .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
+                handleItemProviders(providers)
+                return true
             }
         }
         // Covers the whole window so a message dragged from Apple Mail's list (delivered as a
@@ -91,8 +115,9 @@ struct ContentView: View {
             drainPendingImports()
         }
         .task {
-            // The one network request this app ever makes, and only when enabled in Settings;
-            // it no-ops entirely (no network access) once a week's worth of cache is fresh.
+            // One of only two network requests this app ever makes, and only when enabled in
+            // Settings; it no-ops entirely (no network access) once a week's worth of cache is
+            // fresh. (The other is the manually-triggered SPF recheck in AuthenticationView.)
             if settings.isPublicSuffixListUpdateEnabled {
                 await PublicSuffixList.shared.refreshIfNeeded()
             }
@@ -100,6 +125,9 @@ struct ContentView: View {
         .onChange(of: pendingImports.urls) { _, newValue in
             guard !newValue.isEmpty else { return }
             drainPendingImports()
+        }
+        .onChange(of: fileOpenRequest.token) { _, _ in
+            isImporterPresented = true
         }
     }
 
@@ -110,6 +138,47 @@ struct ContentView: View {
         let urls = pendingImports.drain()
         guard !urls.isEmpty else { return }
         importItems(urls.map { DroppedItem(url: $0, isTemporary: false) })
+    }
+
+    private func remove(_ id: EmailMessage.ID) {
+        messages.removeAll { $0.id == id }
+        if selection == id { selection = nil }
+    }
+
+    /// Extracts plain file URLs from a Finder-origin drag. Applied directly to the sidebar list
+    /// and the detail pane so dropping an `.eml` works whether or not messages are already
+    /// loaded — SwiftUI's own `onDrop` on these specific views is more reliable here than
+    /// relying solely on the window-level `MailDropReceiver` reaching through a `List`'s own
+    /// AppKit-backed drag handling.
+    private func handleItemProviders(_ providers: [NSItemProvider]) {
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var collected: [URL] = []
+
+        for provider in providers {
+            guard provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) else { continue }
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                defer { group.leave() }
+                var url: URL?
+                if let data = item as? Data {
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                } else if let existing = item as? URL {
+                    url = existing
+                }
+                if let url {
+                    lock.lock()
+                    collected.append(url)
+                    lock.unlock()
+                }
+            }
+        }
+
+        group.notify(queue: .main) {
+            if !collected.isEmpty {
+                importItems(collected.map { DroppedItem(url: $0, isTemporary: false) })
+            }
+        }
     }
 
     private func importItems(_ items: [DroppedItem]) {
