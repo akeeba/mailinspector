@@ -10,9 +10,9 @@ import Foundation
 @testable import Mail_Inspector
 
 /// Tests for `AIOpenAICompletionsWire`: building an OpenAI-Chat-Completions-shaped request body
-/// (used by LM Studio, Custom, and most of the hosted provider catalogue), parsing both
-/// streaming (SSE) and non-streaming replies, and extracting the `{"score", "rationale"}` JSON
-/// this dialect uses in place of Apple's native `@Generable` structured output.
+/// (used by LM Studio, Custom, and most of the hosted provider catalogue) and parsing both
+/// streaming (SSE) and non-streaming replies. Score-JSON extraction is shared across every
+/// dialect — see `AIScoreJSONParserTests`.
 @Suite("AIOpenAICompletionsWire")
 struct AIOpenAICompletionsWireTests {
     @Test("Builds a request body with the system prompt, prior history, and the new prompt in order")
@@ -68,33 +68,5 @@ struct AIOpenAICompletionsWireTests {
     func ignoresNonDataLine() throws {
         #expect(AIOpenAICompletionsWire.parseSSELine("") == nil)
         #expect(AIOpenAICompletionsWire.parseSSELine("event: ping") == nil)
-    }
-
-    @Test("Extracts score and rationale from a clean JSON reply")
-    func parsesCleanScoreJSON() throws {
-        let result = try AIOpenAICompletionsWire.parseScoreResult(#"{"score": 42, "rationale": "Mixed signals."}"#)
-        #expect(result.score == 42)
-        #expect(result.rationale == "Mixed signals.")
-    }
-
-    @Test("Strips a markdown code fence some models wrap the JSON reply in despite being told not to")
-    func stripsMarkdownFence() throws {
-        let fenced = "```json\n{\"score\": 10, \"rationale\": \"Looks forged.\"}\n```"
-        let result = try AIOpenAICompletionsWire.parseScoreResult(fenced)
-        #expect(result.score == 10)
-        #expect(result.rationale == "Looks forged.")
-    }
-
-    @Test("Clamps an out-of-range score into 0...100 rather than failing")
-    func clampsOutOfRangeScore() throws {
-        let result = try AIOpenAICompletionsWire.parseScoreResult(#"{"score": 150, "rationale": "Overconfident."}"#)
-        #expect(result.score == 100)
-    }
-
-    @Test("Throws a clear error when the reply has no JSON object in it at all")
-    func throwsOnMissingJSON() throws {
-        #expect(throws: AIEngineError.self) {
-            try AIOpenAICompletionsWire.parseScoreResult("I'm not sure how to answer that.")
-        }
     }
 }

@@ -7,9 +7,10 @@
 
 import Foundation
 
-/// An HTTP-based `AIAnalysisEngine`, parameterized by an `AIProviderDefinition` — used for
-/// LM Studio, Custom (OpenAI-compatible), and, once added, the hosted catalogue. Carries no
-/// `@available` annotation: unlike Apple's on-device model, nothing here needs macOS 27.
+/// An HTTP-based `AIAnalysisEngine`, parameterized by an `AIProviderDefinition` — used for every
+/// provider in the catalogue except On-Device (LM Studio, Custom, and the hosted commercial
+/// catalogue, across all three wire dialects). Carries no `@available` annotation: unlike
+/// Apple's on-device model, nothing here needs macOS 27.
 ///
 /// Unlike `OnDeviceAIEngine` (which lets `LanguageModelSession` manage its own transcript), this
 /// backend is genuinely stateless per HTTP request, so this engine owns conversation history
@@ -22,6 +23,7 @@ import Foundation
 @MainActor
 final class RemoteAIEngine: AIAnalysisEngine {
     private let definition: AIProviderDefinition
+    private let dialect: AIWireDialect
     private let endpoint: String
     private let apiKey: String?
     private let model: String
@@ -31,11 +33,23 @@ final class RemoteAIEngine: AIAnalysisEngine {
     private static let maxHistoryTurns = 20
 
     init(definition: AIProviderDefinition, endpoint: String, apiKey: String?, model: String, systemPrompt: String) {
+        guard case .remote(let dialect) = definition.kind else {
+            fatalError("RemoteAIEngine constructed with a non-remote provider definition: \(definition.key)")
+        }
         self.definition = definition
+        self.dialect = dialect
         self.endpoint = endpoint
         self.apiKey = apiKey
         self.model = model
         self.systemPrompt = systemPrompt
+    }
+
+    private var wireHandler: AIWireDialectHandler.Type {
+        switch dialect {
+        case .openaiCompletions: return AIOpenAICompletionsWire.self
+        case .openaiResponses: return AIOpenAIResponsesWire.self
+        case .anthropic: return AIAnthropicWire.self
+        }
     }
 
     var capabilities: AIEngineCapabilities {
@@ -57,17 +71,17 @@ final class RemoteAIEngine: AIAnalysisEngine {
             exact shape {"score": <integer 0-100>, "rationale": "<one or two sentence rationale>"} \
             and nothing else — no markdown code fence, no extra commentary, no other text.
             """
-        let body = AIOpenAICompletionsWire.requestBody(model: model, systemPrompt: systemPrompt, history: [], newPrompt: prompt, stream: false)
+        let body = wireHandler.requestBody(model: model, systemPrompt: systemPrompt, history: [], newPrompt: prompt, stream: false)
         let data = try await performRequest(path: definition.chatPath, body: body)
-        let text = try AIOpenAICompletionsWire.parseNonStreamingContent(data)
-        return try AIOpenAICompletionsWire.parseScoreResult(text)
+        let text = try wireHandler.parseNonStreamingContent(data)
+        return try AIScoreJSONParser.parse(text)
     }
 
     func streamRespond(prompt: String) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let body = AIOpenAICompletionsWire.requestBody(model: model, systemPrompt: systemPrompt, history: history, newPrompt: prompt, stream: true)
+                    let body = wireHandler.requestBody(model: model, systemPrompt: systemPrompt, history: history, newPrompt: prompt, stream: true)
                     var accumulated = ""
                     try await performStreamingRequest(path: definition.chatPath, body: body) { delta in
                         accumulated += delta
@@ -120,6 +134,11 @@ final class RemoteAIEngine: AIAnalysisEngine {
         } else if !definition.apiKeyOptional {
             throw AIEngineError(message: "\(definition.name) requires an API key. Add one in Settings.")
         }
+        // Required by Anthropic's Messages API on every request, regardless of API key — not
+        // something the generic `auth` scheme (bearer/x-api-key/none) otherwise expresses.
+        if dialect == .anthropic {
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        }
         if let body {
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -147,7 +166,7 @@ final class RemoteAIEngine: AIAnalysisEngine {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
             try Self.validateHTTPResponse(response, data: nil)
             for try await line in bytes.lines {
-                if let delta = AIOpenAICompletionsWire.parseSSELine(line) {
+                if let delta = wireHandler.parseSSELine(line) {
                     onDelta(delta)
                 }
             }

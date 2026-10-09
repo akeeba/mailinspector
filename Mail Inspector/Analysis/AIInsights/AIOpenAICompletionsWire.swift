@@ -8,9 +8,10 @@
 import Foundation
 
 /// Request building and response parsing for the "OpenAI Chat Completions" wire dialect — used
-/// by LM Studio, Custom (OpenAI-compatible), and, once added, most of the hosted catalogue. The
-/// dialects unique to OpenAI's own Responses API and Anthropic's Messages API are a later phase.
-nonisolated enum AIOpenAICompletionsWire {
+/// by LM Studio, Custom (OpenAI-compatible), and most of the hosted catalogue. OpenAI's own
+/// Responses API (`AIOpenAIResponsesWire`) and Anthropic's Messages API (`AIAnthropicWire`) are
+/// each their own dialect.
+nonisolated enum AIOpenAICompletionsWire: AIWireDialectHandler {
     static func requestBody(model: String, systemPrompt: String, history: [ChatTurn], newPrompt: String, stream: Bool) -> [String: Any] {
         var messages: [[String: String]] = [["role": "system", "content": systemPrompt]]
         for turn in history {
@@ -59,34 +60,5 @@ nonisolated enum AIOpenAICompletionsWire {
             return nil
         }
         return content
-    }
-
-    /// Extracts `{"score": 0-100, "rationale": "..."}` from a model's reply to the score prompt —
-    /// the stand-in for Apple's native `@Generable` structured output, which no other provider
-    /// has. Tolerates a markdown code fence some models wrap JSON replies in despite being asked
-    /// not to, and clamps an out-of-range score rather than failing outright.
-    static func parseScoreResult(_ text: String) throws -> AIScoreResult {
-        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("```") {
-            if let firstNewline = trimmed.firstIndex(of: "\n") {
-                trimmed = String(trimmed[trimmed.index(after: firstNewline)...])
-            }
-            if let fenceStart = trimmed.range(of: "```", options: .backwards) {
-                trimmed = String(trimmed[..<fenceStart.lowerBound])
-            }
-            trimmed = trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        guard let start = trimmed.firstIndex(of: "{"), let end = trimmed.lastIndex(of: "}"), start < end else {
-            throw AIEngineError(message: "The provider's response wasn't in the expected format.")
-        }
-        guard let data = String(trimmed[start...end]).data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let scoreNumber = json["score"] as? NSNumber,
-              let rationale = json["rationale"] as? String else {
-            throw AIEngineError(message: "The provider's response wasn't in the expected format.")
-        }
-        let clampedScore = max(0, min(100, scoreNumber.intValue))
-        return AIScoreResult(score: clampedScore, rationale: rationale)
     }
 }
