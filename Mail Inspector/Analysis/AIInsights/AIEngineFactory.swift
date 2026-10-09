@@ -37,6 +37,8 @@ enum AIEngineFactory {
             return isLocalMlxModelReady(modelKey: modelKey)
         case .remote:
             return remoteConfiguration(for: definition, settings: settings) != nil
+        case .systemOne:
+            return systemOneConfiguration(for: definition, settings: settings) != nil
         }
     }
 
@@ -87,6 +89,12 @@ enum AIEngineFactory {
                 return .unavailable(reason: unavailableReasonForRemote(definition, settings: settings))
             }
             return .ready(RemoteAIEngine(definition: definition, endpoint: endpoint, apiKey: apiKey, model: model, systemPrompt: systemPrompt))
+
+        case .systemOne:
+            guard let (endpoint, apiKey, prompt, contextLength) = systemOneConfiguration(for: definition, settings: settings) else {
+                return .unavailable(reason: unavailableReasonForSystemOne(definition, settings: settings))
+            }
+            return .ready(SystemOneAIEngine(definition: definition, endpoint: endpoint, apiKey: apiKey, prompt: prompt, contextLength: contextLength))
         }
     }
 
@@ -117,5 +125,41 @@ enum AIEngineFactory {
             return "\(definition.name) needs an API key — add one in Settings."
         }
         return "\(definition.name) needs a model name — add one in Settings."
+    }
+
+    /// `nil` if anything required is still missing; otherwise the resolved (endpoint, apiKey,
+    /// prompt, contextLength) this System One-family provider is ready to be used with. Unlike
+    /// `remoteConfiguration`, there's no model name to resolve — System One has no model picker —
+    /// and `contextLength` is `nil` whenever the endpoint isn't user-editable (Jev's own fixed,
+    /// hosted endpoint never needs one).
+    @MainActor
+    private static func systemOneConfiguration(for definition: AIProviderDefinition, settings: InspectorSettings) -> (endpoint: String, apiKey: String?, prompt: String, contextLength: Int?)? {
+        let endpoint = settings.aiProviderEndpoints[definition.key] ?? definition.defaultEndpoint
+        guard !endpoint.isEmpty else { return nil }
+
+        let apiKey = AIKeychainStore.get(forProvider: definition.key)
+        guard apiKey != nil || definition.apiKeyOptional else { return nil }
+
+        let prompt = settings.aiProviderPrompts[definition.key] ?? SystemOneAIEngine.defaultPrompt
+        guard !prompt.isEmpty else { return nil }
+
+        let contextLength: Int? = definition.isEndpointEditable
+            ? max(0, min(1_000_000, settings.aiProviderContextLengths[definition.key] ?? 8192))
+            : nil
+
+        return (endpoint, apiKey, prompt, contextLength)
+    }
+
+    @MainActor
+    private static func unavailableReasonForSystemOne(_ definition: AIProviderDefinition, settings: InspectorSettings) -> String {
+        let endpoint = settings.aiProviderEndpoints[definition.key] ?? definition.defaultEndpoint
+        guard !endpoint.isEmpty else {
+            return "\(definition.name) needs an endpoint URL — add one in Settings."
+        }
+        let hasKey = AIKeychainStore.get(forProvider: definition.key) != nil
+        guard hasKey || definition.apiKeyOptional else {
+            return "\(definition.name) needs an API key — add one in Settings."
+        }
+        return "\(definition.name) needs a prompt — add one in Settings."
     }
 }

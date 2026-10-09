@@ -9,7 +9,10 @@
   `AIAnalysisEngine` protocol, per-backend history isolation, the structured-score-vs-chat
   session split) and, if the on-device MLX provider specifically is involved, also read
   `.claude/docs/on-device-mlx-llm.md` (model choices, JSON-schema test findings, the
-  `enable_thinking` gotcha, package-dependency setup).
+  `enable_thinking` gotcha, package-dependency setup); if Jev/System One compatible specifically
+  is involved, also read `.claude/docs/system-one-jev.md` (wire shape, why it's a separate
+  `AIProviderKind`/engine, the `context_length` assumption, and the chat-capability gating that
+  change needed everywhere else).
 - Before touching Dock-icon file drops or `AppDelegate.application(_:open:)`, read
   `.claude/docs/dock-icon-drop-fragility.md` — this exact mechanism has broken twice already for
   two different reasons.

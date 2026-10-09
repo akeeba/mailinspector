@@ -41,10 +41,15 @@ struct AIAnalysisSettingsView: View {
                 if let selectedProvider, selectedProvider.kind != .disabled {
                     providerConfigurationFields(for: selectedProvider)
 
-                    Toggle("Allow including message text in chat", isOn: Binding(
-                        get: { settings.allowIncludingMessageTextInAIChat },
-                        set: { settings.allowIncludingMessageTextInAIChat = $0 }
-                    ))
+                    // Jev and System One compatible are fast yes/no decision-makers with no
+                    // notion of a conversation at all — there's nothing for this toggle to turn
+                    // on or off.
+                    if !isSystemOne(selectedProvider) {
+                        Toggle("Allow including message text in chat", isOn: Binding(
+                            get: { settings.allowIncludingMessageTextInAIChat },
+                            set: { settings.allowIncludingMessageTextInAIChat = $0 }
+                        ))
+                    }
                 }
             } header: {
                 Text("AI Message Analysis")
@@ -53,7 +58,10 @@ struct AIAnalysisSettingsView: View {
                     .font(.caption)
             }
 
-            if let selectedProvider, selectedProvider.kind != .disabled {
+            // The shared System Prompt below is sent for score+analysis+chat — none of which
+            // apply to Jev/System One compatible (score-only, each with its own per-provider
+            // Prompt field instead, shown inline above by `providerConfigurationFields`).
+            if let selectedProvider, selectedProvider.kind != .disabled, !isSystemOne(selectedProvider) {
                 Section {
                     TextEditor(text: Binding(
                         get: { settings.aiSystemPrompt },
@@ -89,6 +97,10 @@ struct AIAnalysisSettingsView: View {
         AIProviderCatalog.definition(for: settings.aiActiveProviderKey)
     }
 
+    private func isSystemOne(_ provider: AIProviderDefinition) -> Bool {
+        provider.kind == .systemOne
+    }
+
     private var aiSectionFooterText: String {
         switch selectedProvider?.kind {
         case .disabled, nil:
@@ -99,6 +111,8 @@ struct AIAnalysisSettingsView: View {
             return "Requires a Mac with an Apple Silicon processor, and enough free unified memory and disk space for the model you pick below. Downloaded once, then runs entirely on-device — nothing ever leaves the Mac, same as Apple's on-device option, but without needing Apple Intelligence or macOS 27. It's a model's opinion, not a verdict; it can be confidently wrong."
         case .remote:
             return "Requires a compatible service, self-hosted (like LM Studio) or online. Sends the signal digest shown elsewhere in this report (SPF/DKIM/DMARC, delivery path, spam score) — never the raw headers — to the endpoint below for each message, plus any chat questions you ask. A locally-hosted server (like LM Studio, at the default address) never leaves this Mac; any other address is a real third party receiving that data. When \"Allow including message text in chat\" is on, a chat question can optionally attach a raw, undecoded excerpt of the message's own text, which goes to the same destination. It's a model's opinion, not a verdict; it can be confidently wrong."
+        case .systemOne:
+            return "A fast decision-maker, not a chat model: each message gets only a 0-100% legitimacy score, computed from the signal digest shown elsewhere in this report (SPF/DKIM/DMARC, delivery path, spam score) — never the raw headers. There's no further insight and no chat against this message's headers or content. Works with TypeSafe.ai's own hosted Jev, or with any live or locally-hosted System One-compatible service (e.g. Laya (local), Clef (local, online)). The built-in prompt below is tuned for TypeSafe.ai's Jev and may not yield satisfactory results with other services — adjust it if needed. A locally-hosted service never leaves this Mac; any other address is a real third party receiving that signal digest. It's a model's opinion, not a verdict; it can be confidently wrong."
         }
     }
 
@@ -120,24 +134,7 @@ struct AIAnalysisSettingsView: View {
         }
 
         if case .remote = provider.kind {
-            let hasStoredKey = AIKeychainStore.get(forProvider: provider.key) != nil
-            HStack {
-                SecureField(
-                    hasStoredKey ? "API key saved — leave blank to keep it" : (provider.apiKeyOptional ? "API key (optional)" : "API key"),
-                    text: $apiKeyInput
-                )
-                .textFieldStyle(.roundedBorder)
-                Button("Save") {
-                    AIKeychainStore.set(apiKeyInput, forProvider: provider.key)
-                    apiKeyInput = ""
-                }
-                .disabled(apiKeyInput.isEmpty)
-                if hasStoredKey {
-                    Button("Clear") {
-                        AIKeychainStore.delete(forProvider: provider.key)
-                    }
-                }
-            }
+            apiKeyField(for: provider)
 
             HStack {
                 TextField("Model name", text: Binding(
@@ -168,6 +165,82 @@ struct AIAnalysisSettingsView: View {
                 Text(modelFetchError)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+
+        if case .systemOne = provider.kind {
+            apiKeyField(for: provider)
+            if provider.isEndpointEditable {
+                contextLengthField(for: provider)
+            }
+            promptField(for: provider)
+        }
+    }
+
+    @ViewBuilder
+    private func apiKeyField(for provider: AIProviderDefinition) -> some View {
+        let hasStoredKey = AIKeychainStore.get(forProvider: provider.key) != nil
+        HStack {
+            SecureField(
+                hasStoredKey ? "API key saved — leave blank to keep it" : (provider.apiKeyOptional ? "API key (optional)" : "API key"),
+                text: $apiKeyInput
+            )
+            .textFieldStyle(.roundedBorder)
+            Button("Save") {
+                AIKeychainStore.set(apiKeyInput, forProvider: provider.key)
+                apiKeyInput = ""
+            }
+            .disabled(apiKeyInput.isEmpty)
+            if hasStoredKey {
+                Button("Clear") {
+                    AIKeychainStore.delete(forProvider: provider.key)
+                }
+            }
+        }
+    }
+
+    private func contextLengthBinding(for provider: AIProviderDefinition) -> Binding<Int> {
+        Binding(
+            get: { settings.aiProviderContextLengths[provider.key] ?? 8192 },
+            set: { settings.aiProviderContextLengths[provider.key] = max(0, min(1_000_000, $0)) }
+        )
+    }
+
+    private func contextLengthField(for provider: AIProviderDefinition) -> some View {
+        let binding = contextLengthBinding(for: provider)
+        return HStack {
+            Text("Context length")
+            TextField("", value: binding, format: .number)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 100)
+            Stepper("", value: binding, in: 0...1_000_000, step: 512)
+                .labelsHidden()
+        }
+    }
+
+    @ViewBuilder
+    private func promptField(for provider: AIProviderDefinition) -> some View {
+        let defaultPrompt = SystemOneAIEngine.defaultPrompt
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Prompt")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextEditor(text: Binding(
+                get: { settings.aiProviderPrompts[provider.key] ?? defaultPrompt },
+                set: { settings.aiProviderPrompts[provider.key] = $0 }
+            ))
+            .font(.body)
+            .frame(minHeight: 100)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor))
+            )
+            HStack {
+                Spacer()
+                Button("Reset Prompt") {
+                    settings.aiProviderPrompts[provider.key] = defaultPrompt
+                }
+                .disabled((settings.aiProviderPrompts[provider.key] ?? defaultPrompt) == defaultPrompt)
             }
         }
     }

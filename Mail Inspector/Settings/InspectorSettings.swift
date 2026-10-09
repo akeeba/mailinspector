@@ -30,6 +30,8 @@ final class InspectorSettings {
     private static let aiProviderEndpointsKey = "aiProviderEndpoints"
     private static let aiProviderModelNamesKey = "aiProviderModelNames"
     private static let aiSystemPromptKey = "aiSystemPrompt"
+    private static let aiProviderPromptsKey = "aiProviderPrompts"
+    private static let aiProviderContextLengthsKey = "aiProviderContextLengths"
     private static let trustedReplyToDomainsBySenderKey = "trustedReplyToDomainsBySender"
     private static let trustedHostnameMismatchesKey = "trustedHostnameMismatches"
 
@@ -188,6 +190,27 @@ final class InspectorSettings {
         }
     }
 
+    /// Remembers each System One-family provider's (Jev, System One compatible) `noul` question
+    /// text across switches. Not a secret. Falls back to `SystemOneAIEngine.defaultPrompt` when
+    /// absent — unlike `aiSystemPrompt`, this is per-provider, not shared: it's the actual
+    /// yes/no question sent with every request, not a persona/instructions prompt, and it's
+    /// meaningless for every other provider kind.
+    var aiProviderPrompts: [String: String] {
+        didSet {
+            UserDefaults.standard.set(aiProviderPrompts, forKey: Self.aiProviderPromptsKey)
+        }
+    }
+
+    /// Remembers each System One-family provider's configured context length (tokens), for
+    /// self-hosted/alternative services whose runtime needs to be told its context window —
+    /// TypeSafe's own hosted Jev endpoint ignores this. Falls back to 8192 when absent; valid
+    /// range is 0 (omit entirely, let the server use its own default) to 1,000,000.
+    var aiProviderContextLengths: [String: Int] {
+        didSet {
+            UserDefaults.standard.set(aiProviderContextLengths, forKey: Self.aiProviderContextLengthsKey)
+        }
+    }
+
     /// Reply-To domains explicitly marked safe for specific senders — e.g. a vendor whose
     /// messages always route replies to a separate help-desk domain. Keyed by lowercased From
     /// address; each value is the list of lowercased Reply-To domains trusted for that sender.
@@ -236,6 +259,8 @@ final class InspectorSettings {
         aiProviderEndpoints = UserDefaults.standard.dictionary(forKey: Self.aiProviderEndpointsKey) as? [String: String] ?? [:]
         aiProviderModelNames = UserDefaults.standard.dictionary(forKey: Self.aiProviderModelNamesKey) as? [String: String] ?? [:]
         aiSystemPrompt = UserDefaults.standard.string(forKey: Self.aiSystemPromptKey) ?? MessageInsightsSession.defaultInstructions
+        aiProviderPrompts = UserDefaults.standard.dictionary(forKey: Self.aiProviderPromptsKey) as? [String: String] ?? [:]
+        aiProviderContextLengths = UserDefaults.standard.dictionary(forKey: Self.aiProviderContextLengthsKey) as? [String: Int] ?? [:]
         trustedReplyToDomainsBySender = UserDefaults.standard.dictionary(forKey: Self.trustedReplyToDomainsBySenderKey) as? [String: [String]] ?? [:]
         if let data = UserDefaults.standard.data(forKey: Self.trustedHostnameMismatchesKey),
            let decoded = try? JSONDecoder().decode([TrustedHostnameMismatch].self, from: data) {

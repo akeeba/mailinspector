@@ -46,6 +46,12 @@ final class MessageInsightsSession {
     /// Either step of the initial analysis is still running.
     var isRunningInitialAnalysis: Bool { isGeneratingScore || isGeneratingAnalysis }
 
+    /// False only for a System One-family engine (Jev, System One compatible) — it answers a
+    /// single yes/no question with no notion of a follow-up conversation, so there's no prose
+    /// analysis to generate and no chat to offer. `AIInsightsView` hides its chat section
+    /// entirely when this is false.
+    var supportsChat: Bool { engine.capabilities.supportsChat }
+
     private let engine: any AIAnalysisEngine
     private let signalsSummary: String
     private var hasRunInitialAnalysis = false
@@ -82,6 +88,8 @@ final class MessageInsightsSession {
             let scoreResult = try await engine.generateScore(signalsSummary: signalsSummary)
             assessment = scoreResult
             isGeneratingScore = false
+
+            guard supportsChat else { return }
 
             isGeneratingAnalysis = true
             let analysisPrompt = """

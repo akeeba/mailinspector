@@ -121,8 +121,10 @@ struct AIInsightsView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
-            Divider()
-            chatSection(session: session)
+            if session.supportsChat {
+                Divider()
+                chatSection(session: session)
+            }
         }
     }
 

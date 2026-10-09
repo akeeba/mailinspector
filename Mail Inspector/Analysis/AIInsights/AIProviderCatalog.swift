@@ -30,6 +30,12 @@ nonisolated enum AIProviderKind: Sendable, Equatable {
     /// `LocalModelDescriptor.key`. Apple Silicon only — see `LocalModelSuitability`.
     case localMlx(modelKey: String)
     case remote(AIWireDialect)
+    /// TypeSafe.ai's System One ("Jev") API, or a self-hosted/alternative service that speaks the
+    /// same `noul`-question shape — a fast legitimacy-probability call, not a chat backend. Its
+    /// own `AIProviderKind` rather than another `AIWireDialect`/`AIWireDialectHandler` conformer,
+    /// since that protocol is shaped entirely around chat history, streaming, and SSE, none of
+    /// which this API has. See `SystemOneAIEngine`.
+    case systemOne
 }
 
 nonisolated struct AIProviderDefinition: Sendable, Equatable, Identifiable {
@@ -55,10 +61,11 @@ nonisolated struct AIProviderDefinition: Sendable, Equatable, Identifiable {
 
 /// The catalogue of AI backends offered in Settings. Display order (not alphabetical): Disabled
 /// first (turns the feature off entirely), then On-Device Apple Intelligence (the zero-config
-/// default), then the on-device MLX models (private and local like Apple's own, but available on
-/// any Apple Silicon Mac regardless of Apple Intelligence eligibility or language support), then
-/// LM Studio ("Recommended" among the network-dependent options — private, local, and far better
-/// at non-English text than Apple's on-device model), then the hosted commercial catalogue, with
+/// default), then Jev and System One (Jev) compatible (fast, score-only — see `SystemOneAIEngine`),
+/// then the on-device MLX models (private and local like Apple's own, but available on any Apple
+/// Silicon Mac regardless of Apple Intelligence eligibility or language support), then LM Studio
+/// ("Recommended" among the network-dependent options — private, local, and far better at
+/// non-English text than Apple's on-device model), then the hosted commercial catalogue, with
 /// Custom always last as the escape hatch for anything else.
 nonisolated enum AIProviderCatalog {
     static let disabled = AIProviderDefinition(
@@ -105,6 +112,37 @@ nonisolated enum AIProviderCatalog {
             isEndpointEditable: false
         )
     }
+
+    /// TypeSafe.ai's own hosted System One service. Fixed endpoint, API key required — see
+    /// `SystemOneAIEngine`.
+    static let jev = AIProviderDefinition(
+        key: "jev",
+        name: "Jev",
+        kind: .systemOne,
+        defaultEndpoint: "https://api.typesafe.ai/v1/systemone",
+        chatPath: "",
+        modelsPath: nil,
+        auth: .bearer,
+        apiKeyOptional: false,
+        isRecommended: false,
+        isEndpointEditable: false
+    )
+
+    /// Any service that speaks the same System One wire shape as Jev — a live alternative, or a
+    /// locally-hosted one (e.g. Laya, Clef). Endpoint is user-provided; API key is optional (the
+    /// common case for a bare local server with no auth configured, same as LM Studio/Custom).
+    static let systemOneCompatible = AIProviderDefinition(
+        key: "systemone_compatible",
+        name: "System One (Jev) compatible",
+        kind: .systemOne,
+        defaultEndpoint: "",
+        chatPath: "",
+        modelsPath: nil,
+        auth: .bearer,
+        apiKeyOptional: true,
+        isRecommended: false,
+        isEndpointEditable: true
+    )
 
     static let lmStudio = AIProviderDefinition(
         key: "lmstudio",
@@ -301,7 +339,8 @@ nonisolated enum AIProviderCatalog {
         anthropic, cohere, deepSeek, gitHub, google, groq, miniMax, mistral, openAI, openRouter, perplexity, scaleway,
     ]
 
-    static let all: [AIProviderDefinition] = [disabled, onDevice] + localMlxModels + [lmStudio] + hostedCommercial + [custom]
+    static let all: [AIProviderDefinition] =
+        [disabled, onDevice, jev, systemOneCompatible] + localMlxModels + [lmStudio] + hostedCommercial + [custom]
 
     static func definition(for key: String) -> AIProviderDefinition? {
         all.first { $0.key == key }

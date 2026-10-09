@@ -220,17 +220,17 @@ struct ContentView: View {
         aiInsightsSessionCache.removeSession(for: id)
     }
 
-    /// Only ever produces a result if the score/analysis were already generated while viewing
-    /// this message — exporting never triggers Apple Intelligence itself, so a message that was
-    /// never opened in the detail view simply exports without this section.
+    /// Only ever produces a result if the score was already generated while viewing this message
+    /// — exporting never triggers the AI backend itself, so a message that was never opened in
+    /// the detail view simply exports without this section. `analysisText` stays `nil` for a
+    /// score-only provider (Jev, System One compatible), which never generates one at all.
     private func aiExportSummary(for message: EmailMessage) -> AIInsightsExportSummary? {
         guard settings.isAIInsightsEnabled else { return nil }
         guard let session = aiInsightsSessionCache.existingSession(for: message.id),
-              let assessment = session.assessment,
-              let analysisText = session.prefabAnalysis else {
+              let assessment = session.assessment else {
             return nil
         }
-        return AIInsightsExportSummary(score: assessment.score, rationale: assessment.rationale, analysisText: analysisText)
+        return AIInsightsExportSummary(score: assessment.score, rationale: assessment.rationale, analysisText: session.prefabAnalysis)
     }
 
     /// Extracts plain file URLs from a Finder-origin drag. Applied directly to the sidebar list

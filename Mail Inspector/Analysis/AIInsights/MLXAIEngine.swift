@@ -121,7 +121,8 @@ final class MLXAIEngine: AIAnalysisEngine {
             supportsStreaming: true,
             supportsModelListing: false,
             requiresApiKey: false,
-            requiresEndpoint: false
+            requiresEndpoint: false,
+            supportsChat: true
         )
     }
 

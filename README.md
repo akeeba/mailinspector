@@ -50,10 +50,17 @@ Message content is never logged or persisted beyond what you explicitly import.
   model and a larger one gated at 16GB of memory), or against a remote provider you configure: LM
   Studio or another local OpenAI-compatible server, and a catalogue of hosted providers (OpenAI,
   Anthropic, Google, Mistral, Cohere, DeepSeek, Groq, MiniMax, OpenRouter, Perplexity, Scaleway,
-  GitHub Models), plus a fully custom OpenAI-compatible endpoint. API keys are stored in the
-  Keychain, never in plain settings. It's a model's opinion, not a verdict — it can be confidently
-  wrong. The system prompt sent to whichever provider is active is itself editable in Settings,
-  with a "Reset Prompt" button to restore the tested default if an edit makes things worse.
+  GitHub Models), plus a fully custom OpenAI-compatible endpoint. Two further options, **Jev** and
+  **System One (Jev) compatible**, use TypeSafe.ai's System One API instead — a fast decision-maker
+  that returns only a 0-100% legitimacy score for each message, with no further insight and no
+  chat against the message's headers or content. Jev talks to TypeSafe.ai's own hosted service;
+  System One compatible points at any live or locally-hosted service speaking the same API (e.g.
+  Laya (local), Clef (local, online)) — the built-in prompt is tuned for TypeSafe.ai's Jev and may
+  not give satisfactory results with other services. API keys are stored in the Keychain, never in
+  plain settings. It's a model's opinion, not a verdict — it can be confidently wrong. The system
+  prompt sent to whichever chat-capable provider is active (and, for Jev/System One compatible,
+  the question it asks instead) is itself editable in Settings, with a "Reset Prompt" button to
+  restore the tested default if an edit makes things worse.
 - **Additional Filtering Headers** — known chain-of-custody and anti-spam headers this app doesn't
   otherwise parse structurally (ARC-*, Received-SPF, X-Spam-*, Microsoft 365/Exchange anti-spam
   headers, Rspamd, mailbox.org), shown as-is with a plain-language explanation of what each means.

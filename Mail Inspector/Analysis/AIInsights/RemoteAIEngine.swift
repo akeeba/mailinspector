@@ -57,7 +57,8 @@ final class RemoteAIEngine: AIAnalysisEngine {
             supportsStreaming: true,
             supportsModelListing: definition.modelsPath != nil,
             requiresApiKey: !definition.apiKeyOptional,
-            requiresEndpoint: definition.isEndpointEditable
+            requiresEndpoint: definition.isEndpointEditable,
+            supportsChat: true
         )
     }
 

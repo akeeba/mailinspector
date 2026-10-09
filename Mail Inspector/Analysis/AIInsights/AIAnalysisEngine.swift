@@ -34,6 +34,11 @@ nonisolated struct AIEngineCapabilities: Sendable, Equatable {
     let supportsModelListing: Bool
     let requiresApiKey: Bool
     let requiresEndpoint: Bool
+    /// False only for `SystemOneAIEngine`: Jev and System One-compatible services answer a single
+    /// yes/no question, with no notion of a follow-up conversation at all. `MessageInsightsSession`
+    /// skips the prose-analysis step and `AIInsightsView` hides the chat section entirely when
+    /// this is false — unlike `supportsStreaming`, there's no "off" chat UI to fall back to.
+    let supportsChat: Bool
 }
 
 /// An already-human-readable failure description — each engine is responsible for translating
