@@ -62,6 +62,28 @@ struct SenderIdentityAnalyzerTests {
         #expect(analysis.observations.contains { $0.title == "Mixed-script characters in display name" })
     }
 
+    @Test("Exposes an actionable ReplyToMismatch naming every To/Cc recipient when the domain isn't yet trusted")
+    func replyToMismatchIsActionable() throws {
+        let message = try makeTestMessage("From: billing@bank.example\r\nReply-To: attacker@evil.example\r\nTo: sales@mycompany.example\r\nCc: ops@mycompany.example\r\n\r\n")
+        let analysis = SenderIdentityAnalyzer.analyze(message: message)
+        #expect(analysis.observations.contains { $0.title == "Reply-To domain differs from From" })
+        let mismatch = try #require(analysis.replyToMismatch)
+        #expect(mismatch.replyToDomain == "evil.example")
+        #expect(mismatch.fromDomain == "bank.example")
+        #expect(Set(mismatch.recipients) == Set(["sales@mycompany.example", "ops@mycompany.example"]))
+    }
+
+    @Test("Suppresses the Reply-To mismatch entirely once the domain is trusted for a recipient of the message")
+    func trustedReplyToDomainSuppressesTheMismatch() throws {
+        let message = try makeTestMessage("From: billing@bank.example\r\nReply-To: attacker@evil.example\r\nTo: sales@mycompany.example\r\n\r\n")
+        let analysis = SenderIdentityAnalyzer.analyze(
+            message: message,
+            trustedReplyToDomainsByRecipient: ["sales@mycompany.example": ["evil.example"]]
+        )
+        #expect(!analysis.observations.contains { $0.title == "Reply-To domain differs from From" })
+        #expect(analysis.replyToMismatch == nil)
+    }
+
     @Test("A clean message with no discrepancies produces no observations")
     func cleanMessageHasNoObservations() throws {
         let message = try makeTestMessage("From: \"Alice\" <alice@example.com>\r\nReply-To: alice@example.com\r\n\r\n")

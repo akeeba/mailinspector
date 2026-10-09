@@ -66,6 +66,74 @@ struct SettingsView: View {
             }
 
             Section {
+                if trustedReplyToEntries.isEmpty {
+                    Text("None yet. Use \u{201c}Mark as Safe\u{201d} next to a Reply-To mismatch in a message's report to add one here.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(trustedReplyToEntries, id: \.self) { entry in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(entry.domain)
+                                    .textSelection(.enabled)
+                                Text("for \(entry.recipient)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button {
+                                settings.removeTrustedReplyToDomain(entry.domain, forRecipient: entry.recipient)
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Remove \(entry.domain) for \(entry.recipient)")
+                        }
+                    }
+                }
+            } header: {
+                Text("Trusted Reply-To Domains")
+            } footer: {
+                Text("Some recipients deliberately route replies to a different domain (e.g. a sales alias whose replies go to a separate help desk) — this app would otherwise flag that as a Reply-To mismatch every time. Entries here suppress that specific notice for that specific recipient.")
+                    .font(.caption)
+            }
+
+            Section {
+                if settings.trustedHostnameMismatches.isEmpty {
+                    Text("None yet. Use \u{201c}Mark as Safe\u{201d} next to a delivery-hop hostname mismatch in a message's report to add one here.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(settings.trustedHostnameMismatches, id: \.self) { entry in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(entry.claimed)
+                                    .textSelection(.enabled)
+                                Text("verified as \(entry.verified)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button {
+                                settings.removeTrustedHostnameMismatch(entry)
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Remove trusted hostname pair \(entry.claimed)")
+                        }
+                    }
+                }
+            } header: {
+                Text("Trusted Delivery-Hop Hostnames")
+            } footer: {
+                Text("Some intermediate mail servers (e.g. an external-facing proxy in front of an internal relay) legitimately claim a hostname that differs from its reverse-DNS name — this app would otherwise flag that as a forged-looking mismatch every time. Entries here suppress that specific warning for that specific claimed/verified pair.")
+                    .font(.caption)
+            }
+
+            Section {
                 Stepper(value: Binding(
                     get: { settings.maxMessageSizeBytes / (1024 * 1024) },
                     set: { settings.maxMessageSizeBytes = max(1, $0) * 1024 * 1024 }
@@ -206,7 +274,27 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 1260)
+        .frame(width: 480, height: 1420)
+    }
+
+    private struct TrustedReplyToEntry: Hashable {
+        let recipient: String
+        let domain: String
+    }
+
+    /// Flattens `trustedReplyToDomainsByRecipient`'s `[recipient: [domain]]` shape into one row
+    /// per (recipient, domain) pair, sorted for a stable display order.
+    private var trustedReplyToEntries: [TrustedReplyToEntry] {
+        var entries: [TrustedReplyToEntry] = []
+        for (recipient, domains) in settings.trustedReplyToDomainsByRecipient {
+            for domain in domains {
+                entries.append(TrustedReplyToEntry(recipient: recipient, domain: domain))
+            }
+        }
+        return entries.sorted { lhs, rhs in
+            guard lhs.recipient == rhs.recipient else { return lhs.recipient < rhs.recipient }
+            return lhs.domain < rhs.domain
+        }
     }
 
     private var selectedProvider: AIProviderDefinition? {

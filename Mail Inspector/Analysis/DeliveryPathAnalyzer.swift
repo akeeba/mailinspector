@@ -24,7 +24,11 @@ nonisolated enum DeliveryPathAnalyzer {
     /// Transit delays longer than this between consecutive hops are flagged as unusually long.
     private static let longTransitThreshold: TimeInterval = 24 * 60 * 60
 
-    static func analyze(message: EmailMessage, trustedAuthServIDs: [String]) -> DeliveryPathAnalysis {
+    /// `trustedHostnameMismatches` are claimed/verified hostname pairs the user has explicitly
+    /// marked safe (see `InspectorSettings.trustHostnameMismatch(claimed:verified:)`) — e.g. an
+    /// internal load balancer whose external-facing proxy hostname legitimately differs from its
+    /// reverse-DNS name. A trusted pair is never flagged at all, not merely downgraded.
+    static func analyze(message: EmailMessage, trustedAuthServIDs: [String], trustedHostnameMismatches: [TrustedHostnameMismatch] = []) -> DeliveryPathAnalysis {
         // Received headers are prepended by each relay, so header order is newest-first; reverse
         // to get the chronological (oldest-first) order this app presents.
         let parsedNewestFirst = ReceivedHeaderParser.parseAll(from: message.parsed)
@@ -50,8 +54,8 @@ nonisolated enum DeliveryPathAnalyzer {
         for (index, parsedHop) in parsedOldestFirst.enumerated() {
             var flags: [DeliveryHopFlag] = []
             var nextFlagID = 0
-            func addFlag(_ severity: ObservationSeverity, _ message: String) {
-                flags.append(DeliveryHopFlag(id: nextFlagID, severity: severity, message: message))
+            func addFlag(_ severity: ObservationSeverity, _ message: String, trustableHostnameMismatch: TrustedHostnameMismatch? = nil) {
+                flags.append(DeliveryHopFlag(id: nextFlagID, severity: severity, message: message, trustableHostnameMismatch: trustableHostnameMismatch))
                 nextFlagID += 1
             }
 
@@ -92,8 +96,13 @@ nonisolated enum DeliveryPathAnalyzer {
                    claimed.caseInsensitiveCompare(verified) != .orderedSame,
                    !claimed.contains(verified), !verified.contains(claimed) {
                     // The claimed hostname actively contradicts what reverse DNS found — this is
-                    // the "obviously forged" case, a genuine warning.
-                    addFlag(.warning, "Claimed sending hostname \u{201c}\(claimed)\u{201d} does not match \u{201c}\(verified)\u{201d}, which the receiving server found via reverse DNS.")
+                    // the "obviously forged" case, a genuine warning — unless the user has
+                    // already marked this exact pair safe (e.g. a proxy whose external-facing
+                    // hostname legitimately differs from its reverse-DNS name).
+                    let candidate = TrustedHostnameMismatch(claimed: claimed, verified: verified)
+                    if !trustedHostnameMismatches.contains(candidate) {
+                        addFlag(.warning, "Claimed sending hostname \u{201c}\(claimed)\u{201d} does not match \u{201c}\(verified)\u{201d}, which the receiving server found via reverse DNS.", trustableHostnameMismatch: candidate)
+                    }
                 } else if parsedHop.verifiedFromHostname?.caseInsensitiveCompare("unknown") == .orderedSame {
                     // An unresolvable reverse DNS lookup is extremely common for internal SaaS
                     // infrastructure and tells you nothing by itself — a notice, not a warning.

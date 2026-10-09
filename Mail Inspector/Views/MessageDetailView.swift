@@ -28,7 +28,7 @@ struct MessageDetailView: View {
     private let arrowScrollStep: CGFloat = 60
 
     private var senderIdentityAnalysis: SenderIdentityAnalysis {
-        SenderIdentityAnalyzer.analyze(message: message)
+        SenderIdentityAnalyzer.analyze(message: message, trustedReplyToDomainsByRecipient: settings.trustedReplyToDomainsByRecipient)
     }
 
     private var authenticationAnalysis: AuthenticationAnalysis {
@@ -40,7 +40,7 @@ struct MessageDetailView: View {
     }
 
     private var deliveryPathAnalysis: DeliveryPathAnalysis {
-        DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: settings.trustedAuthServIDs)
+        DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: settings.trustedAuthServIDs, trustedHostnameMismatches: settings.trustedHostnameMismatches)
     }
 
     private var additionalHeaders: [AdditionalSecurityHeader] {
@@ -122,7 +122,12 @@ struct MessageDetailView: View {
                         spamAssessment: spamAssessment,
                         brandImagesEnabled: settings.showBrandImages,
                         hideBrandImagesForMessagesWithoutSpamScore: settings.hideBrandImagesForMessagesWithoutSpamScore,
-                        hideBrandImagesAboveSpamThreshold: settings.hideBrandImagesAboveSpamThreshold
+                        hideBrandImagesAboveSpamThreshold: settings.hideBrandImagesAboveSpamThreshold,
+                        replyToMismatch: senderIdentityAnalysis.replyToMismatch,
+                        onTrustReplyToDomain: {
+                            guard let mismatch = senderIdentityAnalysis.replyToMismatch else { return }
+                            settings.trustReplyToDomain(mismatch.replyToDomain, forRecipients: mismatch.recipients)
+                        }
                     )
                         .focusable()
                         .focused($focusedSection, equals: .senderIdentity)
@@ -151,7 +156,12 @@ struct MessageDetailView: View {
                             .id(ReportSection.spam)
                     }
                     Divider()
-                    DeliveryPathView(analysis: deliveryPathAnalysis)
+                    DeliveryPathView(
+                        analysis: deliveryPathAnalysis,
+                        onTrustHostnameMismatch: { mismatch in
+                            settings.trustHostnameMismatch(claimed: mismatch.claimed, verified: mismatch.verified)
+                        }
+                    )
                         .focusable()
                         .focused($focusedSection, equals: .deliveryPath)
                         .id(ReportSection.deliveryPath)

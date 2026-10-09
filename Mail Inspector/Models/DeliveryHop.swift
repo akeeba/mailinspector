@@ -33,6 +33,18 @@ nonisolated struct DeliveryHopFlag: Sendable, Identifiable, Hashable {
     let id: Int
     let severity: ObservationSeverity
     let message: String
+    /// Set only for the "claimed hostname contradicts reverse DNS" warning — lets
+    /// `DeliveryPathView` offer a "Mark as Safe" action right next to this specific flag,
+    /// without every other flag kind (unresolvable reverse DNS, long transit, etc.) needing to
+    /// carry trust data they have no use for.
+    let trustableHostnameMismatch: TrustedHostnameMismatch?
+
+    init(id: Int, severity: ObservationSeverity, message: String, trustableHostnameMismatch: TrustedHostnameMismatch? = nil) {
+        self.id = id
+        self.severity = severity
+        self.message = message
+        self.trustableHostnameMismatch = trustableHostnameMismatch
+    }
 }
 
 /// One `Received:` header, parsed into its conventional (not formally standardized) fields.

@@ -16,6 +16,8 @@ struct SenderIdentityView: View {
     var brandImagesEnabled: Bool = false
     var hideBrandImagesForMessagesWithoutSpamScore: Bool = true
     var hideBrandImagesAboveSpamThreshold: Double = 25
+    var replyToMismatch: ReplyToMismatch? = nil
+    var onTrustReplyToDomain: (() -> Void)? = nil
 
     @State private var brandImage: NSImage?
 
@@ -70,6 +72,20 @@ struct SenderIdentityView: View {
                 }
                 if !message.replyToEntries.isEmpty {
                     detailRow("Reply-To", addressSummary(message.replyToEntries))
+                    if let replyToMismatch {
+                        GridRow {
+                            // `Color` has no intrinsic size, so left unconstrained it happily
+                            // expands to fill whatever width Grid offers — which, with nothing
+                            // else in this column to measure against on this row, blew up the
+                            // whole label column's width and pushed every row in the Grid over.
+                            // `gridCellUnsizedAxes` tells Grid to ignore this cell when sizing
+                            // the column, leaving that to the real label cells (`detailRow`'s
+                            // "Sender"/"Reply-To"/etc. text) as before.
+                            Color.clear
+                                .gridCellUnsizedAxes(.horizontal)
+                            replyToMismatchBanner(replyToMismatch)
+                        }
+                    }
                 }
                 if let returnPath = message.returnPath {
                     detailRow("Return-Path", returnPath)
@@ -88,6 +104,20 @@ struct SenderIdentityView: View {
                 } else if let raw = message.dateHeaderRaw {
                     detailRow("Date (unparsed)", raw)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func replyToMismatchBanner(_ mismatch: ReplyToMismatch) -> some View {
+        HStack(spacing: 8) {
+            Label("Replies would go to \u{201c}\(mismatch.replyToDomain)\u{201d}, not \u{201c}\(mismatch.fromDomain)\u{201d}", systemImage: ObservationSeverity.notable.symbolName)
+                .font(.caption)
+                .foregroundStyle(ObservationSeverity.notable.tintColor)
+            if let onTrustReplyToDomain {
+                Button("Mark as Safe", action: onTrustReplyToDomain)
+                    .buttonStyle(.link)
+                    .font(.caption)
             }
         }
     }

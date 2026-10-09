@@ -39,7 +39,7 @@ struct ReportExportView: View {
     var aiInsights: AIInsightsExportSummary? = nil
 
     private var senderIdentityAnalysis: SenderIdentityAnalysis {
-        SenderIdentityAnalyzer.analyze(message: message)
+        SenderIdentityAnalyzer.analyze(message: message, trustedReplyToDomainsByRecipient: settings.trustedReplyToDomainsByRecipient)
     }
 
     private var authenticationAnalysis: AuthenticationAnalysis {
@@ -51,7 +51,7 @@ struct ReportExportView: View {
     }
 
     private var deliveryPathAnalysis: DeliveryPathAnalysis {
-        DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: settings.trustedAuthServIDs)
+        DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: settings.trustedAuthServIDs, trustedHostnameMismatches: settings.trustedHostnameMismatches)
     }
 
     private var additionalHeaders: [AdditionalSecurityHeader] {

@@ -27,6 +27,8 @@ final class InspectorSettings {
     private static let aiActiveProviderKeyKey = "aiActiveProviderKey"
     private static let aiProviderEndpointsKey = "aiProviderEndpoints"
     private static let aiProviderModelNamesKey = "aiProviderModelNames"
+    private static let trustedReplyToDomainsByRecipientKey = "trustedReplyToDomainsByRecipient"
+    private static let trustedHostnameMismatchesKey = "trustedHostnameMismatches"
 
     var maxMessageSizeBytes: Int = InspectorSettings.defaultMaxMessageSizeBytes
 
@@ -174,6 +176,29 @@ final class InspectorSettings {
         }
     }
 
+    /// Reply-To domains explicitly marked safe for specific recipients of the user's own — e.g.
+    /// a sales alias whose replies are deliberately routed to a different domain's help desk.
+    /// Keyed by lowercased recipient address; each value is the list of lowercased Reply-To
+    /// domains trusted for that recipient. Grown only via `trustReplyToDomain(_:forRecipients:)`,
+    /// driven by a "Mark as Safe" action next to the mismatch itself in the report — not meant to
+    /// be hand-typed.
+    var trustedReplyToDomainsByRecipient: [String: [String]] {
+        didSet {
+            UserDefaults.standard.set(trustedReplyToDomainsByRecipient, forKey: Self.trustedReplyToDomainsByRecipientKey)
+        }
+    }
+
+    /// Claimed/verified hostname pairs explicitly marked safe — e.g. an internal proxy whose
+    /// external-facing hostname legitimately differs from its reverse-DNS name. Grown only via
+    /// `trustHostnameMismatch(claimed:verified:)`.
+    var trustedHostnameMismatches: [TrustedHostnameMismatch] {
+        didSet {
+            if let data = try? JSONEncoder().encode(trustedHostnameMismatches) {
+                UserDefaults.standard.set(data, forKey: Self.trustedHostnameMismatchesKey)
+            }
+        }
+    }
+
     init() {
         trustedAuthServIDs = UserDefaults.standard.stringArray(forKey: Self.trustedAuthServIDsKey) ?? []
         trustAllAuthenticationResultsByDefault = UserDefaults.standard.object(forKey: Self.trustAllAuthenticationResultsByDefaultKey) as? Bool ?? true
@@ -190,5 +215,50 @@ final class InspectorSettings {
         aiActiveProviderKey = UserDefaults.standard.string(forKey: Self.aiActiveProviderKeyKey) ?? AIProviderCatalog.onDevice.key
         aiProviderEndpoints = UserDefaults.standard.dictionary(forKey: Self.aiProviderEndpointsKey) as? [String: String] ?? [:]
         aiProviderModelNames = UserDefaults.standard.dictionary(forKey: Self.aiProviderModelNamesKey) as? [String: String] ?? [:]
+        trustedReplyToDomainsByRecipient = UserDefaults.standard.dictionary(forKey: Self.trustedReplyToDomainsByRecipientKey) as? [String: [String]] ?? [:]
+        if let data = UserDefaults.standard.data(forKey: Self.trustedHostnameMismatchesKey),
+           let decoded = try? JSONDecoder().decode([TrustedHostnameMismatch].self, from: data) {
+            trustedHostnameMismatches = decoded
+        } else {
+            trustedHostnameMismatches = []
+        }
+    }
+
+    /// Marks a Reply-To domain safe for every given recipient — called from the "Mark as Safe"
+    /// action next to a Reply-To mismatch in the report, never meant to be hand-typed.
+    func trustReplyToDomain(_ domain: String, forRecipients recipients: [String]) {
+        let normalizedDomain = domain.lowercased()
+        for recipient in recipients {
+            let key = recipient.lowercased()
+            var domains = trustedReplyToDomainsByRecipient[key] ?? []
+            guard !domains.contains(normalizedDomain) else { continue }
+            domains.append(normalizedDomain)
+            trustedReplyToDomainsByRecipient[key] = domains
+        }
+    }
+
+    /// Removes a single recipient/Reply-To-domain trust entry — used by Settings' review list.
+    func removeTrustedReplyToDomain(_ domain: String, forRecipient recipient: String) {
+        let key = recipient.lowercased()
+        guard var domains = trustedReplyToDomainsByRecipient[key] else { return }
+        domains.removeAll { $0.caseInsensitiveCompare(domain) == .orderedSame }
+        if domains.isEmpty {
+            trustedReplyToDomainsByRecipient.removeValue(forKey: key)
+        } else {
+            trustedReplyToDomainsByRecipient[key] = domains
+        }
+    }
+
+    /// Marks a claimed/verified hostname pair safe — called from the "Mark as Safe" action next
+    /// to a delivery-hop hostname-mismatch warning, never meant to be hand-typed.
+    func trustHostnameMismatch(claimed: String, verified: String) {
+        let entry = TrustedHostnameMismatch(claimed: claimed, verified: verified)
+        guard !trustedHostnameMismatches.contains(entry) else { return }
+        trustedHostnameMismatches.append(entry)
+    }
+
+    /// Removes a single trusted hostname pair — used by Settings' review list.
+    func removeTrustedHostnameMismatch(_ entry: TrustedHostnameMismatch) {
+        trustedHostnameMismatches.removeAll { $0 == entry }
     }
 }

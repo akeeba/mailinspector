@@ -10,6 +10,7 @@ import SwiftUI
 /// Section C: the message's apparent delivery path, oldest to newest.
 struct DeliveryPathView: View {
     let analysis: DeliveryPathAnalysis
+    var onTrustHostnameMismatch: ((TrustedHostnameMismatch) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -27,7 +28,7 @@ struct DeliveryPathView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(analysis.hops.enumerated()), id: \.element.id) { index, hop in
-                        DeliveryHopRow(hop: hop, isLast: index == analysis.hops.count - 1)
+                        DeliveryHopRow(hop: hop, isLast: index == analysis.hops.count - 1, onTrustHostnameMismatch: onTrustHostnameMismatch)
                     }
                 }
             }
@@ -38,6 +39,7 @@ struct DeliveryPathView: View {
 private struct DeliveryHopRow: View {
     let hop: DeliveryHop
     let isLast: Bool
+    var onTrustHostnameMismatch: ((TrustedHostnameMismatch) -> Void)? = nil
     @State private var isExpanded = false
 
     var body: some View {
@@ -76,9 +78,18 @@ private struct DeliveryHopRow: View {
                         detail("TLS", tlsVersion + (hop.tlsCipher.map { " (\($0))" } ?? ""))
                     }
                     ForEach(hop.flags) { flag in
-                        Label(flag.message, systemImage: flag.severity.symbolName)
-                            .font(.caption)
-                            .foregroundStyle(flag.severity.tintColor)
+                        HStack(spacing: 8) {
+                            Label(flag.message, systemImage: flag.severity.symbolName)
+                                .font(.caption)
+                                .foregroundStyle(flag.severity.tintColor)
+                            if let mismatch = flag.trustableHostnameMismatch, let onTrustHostnameMismatch {
+                                Button("Mark as Safe") {
+                                    onTrustHostnameMismatch(mismatch)
+                                }
+                                .buttonStyle(.link)
+                                .font(.caption)
+                            }
+                        }
                     }
                     Text(hop.rawHeaderText)
                         .font(.system(.caption, design: .monospaced))

@@ -104,6 +104,16 @@ struct DeliveryPathAnalyzerTests {
         let flag = analysis.hops[0].flags.first { $0.message.contains("does not match") }
         #expect(flag != nil)
         #expect(flag?.severity == .warning)
+        #expect(flag?.trustableHostnameMismatch == TrustedHostnameMismatch(claimed: "totally-different.example", verified: "actual-ptr.evil.example"))
+    }
+
+    @Test("Never flags a claimed/verified hostname pair the user has already marked safe")
+    func trustedHostnameMismatchIsNeverFlagged() throws {
+        let raw = "Received: from 4-vm-proxy01.qoezx0nhuetupiohjnl32pupeb.ax.internal.cloudapp.net (4-vm-proxy01.internal.cloudapp.net [10.1.2.3]) by mx.recipient.example; Mon, 2 Jan 2006 15:04:05 +0000\r\n\r\n"
+        let message = try makeTestMessage(raw)
+        let trusted = [TrustedHostnameMismatch(claimed: "4-vm-proxy01.qoezx0nhuetupiohjnl32pupeb.ax.internal.cloudapp.net", verified: "4-vm-proxy01.internal.cloudapp.net")]
+        let analysis = DeliveryPathAnalyzer.analyze(message: message, trustedAuthServIDs: [], trustedHostnameMismatches: trusted)
+        #expect(analysis.hops[0].flags.isEmpty)
     }
 
     @Test("Does not flag the final hop's missing \"from\" clause when it's the recipient's own local delivery step, not a relay")
