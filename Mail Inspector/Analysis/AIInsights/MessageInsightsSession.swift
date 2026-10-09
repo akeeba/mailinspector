@@ -55,7 +55,10 @@ final class MessageInsightsSession {
         self.signalsSummary = signalsSummary
     }
 
-    static let instructions = """
+    /// The tested, shipped-with-the-app system prompt. `InspectorSettings.aiSystemPrompt`
+    /// defaults to this and can be freely edited in Settings; this constant itself never
+    /// changes, so "Reset Prompt" always has something stable to go back to.
+    static let defaultInstructions = """
         You are a careful, skeptical email-security assistant helping someone judge whether an \
         email message is legitimate or a forgery/phishing attempt. You are given a short digest \
         of signals this app already computed from the message's headers — SPF/DKIM/DMARC \

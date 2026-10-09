@@ -52,6 +52,34 @@ struct AIAnalysisSettingsView: View {
                 Text(aiSectionFooterText)
                     .font(.caption)
             }
+
+            if let selectedProvider, selectedProvider.kind != .disabled {
+                Section {
+                    TextEditor(text: Binding(
+                        get: { settings.aiSystemPrompt },
+                        set: { settings.aiSystemPrompt = $0 }
+                    ))
+                    .font(.body)
+                    .frame(minHeight: 160)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color(nsColor: .separatorColor))
+                    )
+
+                    HStack {
+                        Spacer()
+                        Button("Reset Prompt") {
+                            settings.aiSystemPrompt = MessageInsightsSession.defaultInstructions
+                        }
+                        .disabled(settings.aiSystemPrompt == MessageInsightsSession.defaultInstructions)
+                    }
+                } header: {
+                    Text("System Prompt")
+                } footer: {
+                    Text("Sent to whichever provider is active above for every message's score, analysis, and chat. This is the one part of the app's own behavior you can rewrite directly — a careless edit can make scores and answers noticeably worse (or stop the score from coming back as valid JSON at all), so if things get strange after editing this, use Reset Prompt to go back to the tested default.")
+                        .font(.caption)
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: 480)

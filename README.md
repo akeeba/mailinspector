@@ -52,7 +52,8 @@ Message content is never logged or persisted beyond what you explicitly import.
   Anthropic, Google, Mistral, Cohere, DeepSeek, Groq, MiniMax, OpenRouter, Perplexity, Scaleway,
   GitHub Models), plus a fully custom OpenAI-compatible endpoint. API keys are stored in the
   Keychain, never in plain settings. It's a model's opinion, not a verdict — it can be confidently
-  wrong.
+  wrong. The system prompt sent to whichever provider is active is itself editable in Settings,
+  with a "Reset Prompt" button to restore the tested default if an edit makes things worse.
 - **Additional Filtering Headers** — known chain-of-custody and anti-spam headers this app doesn't
   otherwise parse structurally (ARC-*, Received-SPF, X-Spam-*, Microsoft 365/Exchange anti-spam
   headers, Rspamd, mailbox.org), shown as-is with a plain-language explanation of what each means.

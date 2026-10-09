@@ -31,7 +31,7 @@ struct AIInsightsView: View {
     }
 
     private var engineAvailability: AIEngineAvailability {
-        AIEngineFactory.resolveActiveEngine(settings: settings, systemPrompt: MessageInsightsSession.instructions)
+        AIEngineFactory.resolveActiveEngine(settings: settings, systemPrompt: settings.aiSystemPrompt)
     }
 
     /// Looked up (or created, on first access) through the shared cache, keyed by message id —

@@ -29,6 +29,7 @@ final class InspectorSettings {
     private static let aiActiveProviderKeyKey = "aiActiveProviderKey"
     private static let aiProviderEndpointsKey = "aiProviderEndpoints"
     private static let aiProviderModelNamesKey = "aiProviderModelNames"
+    private static let aiSystemPromptKey = "aiSystemPrompt"
     private static let trustedReplyToDomainsBySenderKey = "trustedReplyToDomainsBySender"
     private static let trustedHostnameMismatchesKey = "trustedHostnameMismatches"
 
@@ -175,6 +176,18 @@ final class InspectorSettings {
         }
     }
 
+    /// The system/instructions prompt sent to whichever AI provider is active, for every
+    /// message's score, analysis, and chat — shared across all providers, since it describes
+    /// the task ("you are a careful, skeptical email-security assistant...") rather than
+    /// anything provider-specific. Defaults to, and can be reset back to,
+    /// `MessageInsightsSession.defaultInstructions`; editing it is an advanced/power-user
+    /// escape hatch exposed directly in Settings, not something most people need to touch.
+    var aiSystemPrompt: String {
+        didSet {
+            UserDefaults.standard.set(aiSystemPrompt, forKey: Self.aiSystemPromptKey)
+        }
+    }
+
     /// Reply-To domains explicitly marked safe for specific senders — e.g. a vendor whose
     /// messages always route replies to a separate help-desk domain. Keyed by lowercased From
     /// address; each value is the list of lowercased Reply-To domains trusted for that sender.
@@ -222,6 +235,7 @@ final class InspectorSettings {
         }
         aiProviderEndpoints = UserDefaults.standard.dictionary(forKey: Self.aiProviderEndpointsKey) as? [String: String] ?? [:]
         aiProviderModelNames = UserDefaults.standard.dictionary(forKey: Self.aiProviderModelNamesKey) as? [String: String] ?? [:]
+        aiSystemPrompt = UserDefaults.standard.string(forKey: Self.aiSystemPromptKey) ?? MessageInsightsSession.defaultInstructions
         trustedReplyToDomainsBySender = UserDefaults.standard.dictionary(forKey: Self.trustedReplyToDomainsBySenderKey) as? [String: [String]] ?? [:]
         if let data = UserDefaults.standard.data(forKey: Self.trustedHostnameMismatchesKey),
            let decoded = try? JSONDecoder().decode([TrustedHostnameMismatch].self, from: data) {
