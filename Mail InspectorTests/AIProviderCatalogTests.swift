@@ -9,9 +9,9 @@ import Testing
 import Foundation
 @testable import Mail_Inspector
 
-/// Tests for `AIProviderCatalog`: every entry has a unique key, Disabled sorts first, LM Studio
-/// sorts right after it and is marked recommended, On-Device has no network surface, and lookup
-/// by key works.
+/// Tests for `AIProviderCatalog`: every entry has a unique key, the picker order is Disabled,
+/// On-Device, the on-device MLX models, LM Studio, then everything else, On-Device has no
+/// network surface, and lookup by key works.
 @Suite("AIProviderCatalog")
 struct AIProviderCatalogTests {
     @Test("Every provider has a unique key")
@@ -26,10 +26,29 @@ struct AIProviderCatalogTests {
         #expect(AIProviderCatalog.all.first?.kind == .disabled)
     }
 
-    @Test("LM Studio is second in the list and marked recommended")
-    func lmStudioIsSecondAndRecommended() throws {
-        #expect(AIProviderCatalog.all.dropFirst().first?.key == "lmstudio")
-        #expect(AIProviderCatalog.all.dropFirst().first?.isRecommended == true)
+    @Test("On-Device Apple Intelligence is second, before the on-device MLX models")
+    func onDeviceIsSecond() throws {
+        #expect(AIProviderCatalog.all.dropFirst().first?.key == "apple_ondevice")
+    }
+
+    @Test("Both on-device MLX models sort between On-Device and LM Studio, keyed by model")
+    func localMlxModelsSortBetweenOnDeviceAndLMStudio() throws {
+        let keys = AIProviderCatalog.all.map(\.key)
+        guard let onDeviceIndex = keys.firstIndex(of: "apple_ondevice"),
+              let lmStudioIndex = keys.firstIndex(of: "lmstudio") else {
+            Issue.record("Expected both apple_ondevice and lmstudio to be present")
+            return
+        }
+        let between = keys[(onDeviceIndex + 1)..<lmStudioIndex]
+        #expect(Set(between) == Set(LocalModelCatalogue.all.map(\.key)))
+        for key in between {
+            #expect(AIProviderCatalog.definition(for: key)?.kind == .localMlx(modelKey: key))
+        }
+    }
+
+    @Test("LM Studio is marked recommended")
+    func lmStudioIsRecommended() throws {
+        #expect(AIProviderCatalog.definition(for: "lmstudio")?.isRecommended == true)
     }
 
     @Test("On-Device Apple Intelligence has no endpoint, no editable endpoint, and no models path")

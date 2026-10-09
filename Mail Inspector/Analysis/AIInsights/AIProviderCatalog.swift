@@ -26,6 +26,9 @@ nonisolated enum AIProviderAuthScheme: String, Sendable, Equatable {
 nonisolated enum AIProviderKind: Sendable, Equatable {
     case disabled
     case onDevice
+    /// An on-device MLX model downloaded from `LocalModelCatalogue`, identified by its
+    /// `LocalModelDescriptor.key`. Apple Silicon only — see `LocalModelSuitability`.
+    case localMlx(modelKey: String)
     case remote(AIWireDialect)
 }
 
@@ -51,10 +54,12 @@ nonisolated struct AIProviderDefinition: Sendable, Equatable, Identifiable {
 }
 
 /// The catalogue of AI backends offered in Settings. Display order (not alphabetical): Disabled
-/// first (turns the feature off entirely), then LM Studio ("Recommended" — private, local, and
-/// far better at non-English text than the on-device model), then On-Device Apple Intelligence
-/// (the zero-config default), then the hosted commercial catalogue, with Custom always last as
-/// the escape hatch for anything else.
+/// first (turns the feature off entirely), then On-Device Apple Intelligence (the zero-config
+/// default), then the on-device MLX models (private and local like Apple's own, but available on
+/// any Apple Silicon Mac regardless of Apple Intelligence eligibility or language support), then
+/// LM Studio ("Recommended" among the network-dependent options — private, local, and far better
+/// at non-English text than Apple's on-device model), then the hosted commercial catalogue, with
+/// Custom always last as the escape hatch for anything else.
 nonisolated enum AIProviderCatalog {
     static let disabled = AIProviderDefinition(
         key: "disabled",
@@ -81,6 +86,25 @@ nonisolated enum AIProviderCatalog {
         isRecommended: false,
         isEndpointEditable: false
     )
+
+    /// One `AIProviderDefinition` per `LocalModelCatalogue` entry — one provider is one model,
+    /// matching the proven pattern at `~/Projects/grafida/grafida-ipad`. No endpoint, no API key:
+    /// readiness is instead gated by `LocalModelSuitability` + `LocalModelStore.isInstalled`
+    /// (see `AIEngineFactory`).
+    static let localMlxModels: [AIProviderDefinition] = LocalModelCatalogue.all.map { descriptor in
+        AIProviderDefinition(
+            key: descriptor.key,
+            name: descriptor.name,
+            kind: .localMlx(modelKey: descriptor.key),
+            defaultEndpoint: "",
+            chatPath: "",
+            modelsPath: nil,
+            auth: .none,
+            apiKeyOptional: true,
+            isRecommended: false,
+            isEndpointEditable: false
+        )
+    }
 
     static let lmStudio = AIProviderDefinition(
         key: "lmstudio",
@@ -277,7 +301,7 @@ nonisolated enum AIProviderCatalog {
         anthropic, cohere, deepSeek, gitHub, google, groq, miniMax, mistral, openAI, openRouter, perplexity, scaleway,
     ]
 
-    static let all: [AIProviderDefinition] = [disabled, lmStudio, onDevice] + hostedCommercial + [custom]
+    static let all: [AIProviderDefinition] = [disabled, onDevice] + localMlxModels + [lmStudio] + hostedCommercial + [custom]
 
     static func definition(for key: String) -> AIProviderDefinition? {
         all.first { $0.key == key }

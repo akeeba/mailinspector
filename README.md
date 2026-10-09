@@ -44,13 +44,15 @@ Message content is never logged or persisted beyond what you explicitly import.
 - **AI Message Analysis** (off by default) — a 0-100 legitimacy gauge, a short prose analysis, and
   a follow-up chat, generated from the signals already shown elsewhere in the report (SPF/DKIM/
   DMARC, delivery path, spam score) — never the raw headers or message body, unless you explicitly
-  opt in to attaching a text excerpt to a specific chat question. Runs either fully on-device via
-  Apple Intelligence (macOS 27+, eligible hardware, zero configuration, nothing ever leaves the
-  Mac) or against a remote provider you configure: LM Studio or another local OpenAI-compatible
-  server, and a catalogue of hosted providers (OpenAI, Anthropic, Google, Mistral, Cohere,
-  DeepSeek, Groq, MiniMax, OpenRouter, Perplexity, Scaleway, GitHub Models), plus a fully custom
-  OpenAI-compatible endpoint. API keys are stored in the Keychain, never in plain settings. It's a
-  model's opinion, not a verdict — it can be confidently wrong.
+  opt in to attaching a text excerpt to a specific chat question. Runs fully on-device via Apple
+  Intelligence (macOS 27+, eligible hardware, zero configuration), fully on-device via a model you
+  download once and run locally through MLX (Apple Silicon Macs only — a small, broadly-compatible
+  model and a larger one gated at 16GB of memory), or against a remote provider you configure: LM
+  Studio or another local OpenAI-compatible server, and a catalogue of hosted providers (OpenAI,
+  Anthropic, Google, Mistral, Cohere, DeepSeek, Groq, MiniMax, OpenRouter, Perplexity, Scaleway,
+  GitHub Models), plus a fully custom OpenAI-compatible endpoint. API keys are stored in the
+  Keychain, never in plain settings. It's a model's opinion, not a verdict — it can be confidently
+  wrong.
 - **Additional Filtering Headers** — known chain-of-custody and anti-spam headers this app doesn't
   otherwise parse structurally (ARC-*, Received-SPF, X-Spam-*, Microsoft 365/Exchange anti-spam
   headers, Rspamd, mailbox.org), shown as-is with a plain-language explanation of what each means.
@@ -91,9 +93,12 @@ message, its score and analysis are included in the export.
 ## Requirements
 
 - macOS (latest SDK), Swift 6, SwiftUI + AppKit.
-- No third-party dependencies.
-- AI Message Analysis's on-device option requires macOS 27+ with Apple Intelligence enabled on
-  eligible hardware; every other feature works without it.
+- Third-party dependencies: `mlx-swift-lm` and `swift-transformers`, used only by AI Message
+  Analysis's on-device MLX option.
+- AI Message Analysis's Apple Intelligence option requires macOS 27+ with Apple Intelligence
+  enabled on eligible hardware; its on-device MLX option requires an Apple Silicon Mac with
+  enough free memory for the model you pick. Every other feature, including the rest of AI
+  Message Analysis (a remote provider), works without either.
 
 ## Building
 

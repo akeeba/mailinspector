@@ -33,9 +33,21 @@ enum AIEngineFactory {
             return false
         case .onDevice:
             return AIInsightsAvailability.current == .available
+        case .localMlx(let modelKey):
+            return isLocalMlxModelReady(modelKey: modelKey)
         case .remote:
             return remoteConfiguration(for: definition, settings: settings) != nil
         }
+    }
+
+    /// Ready means suitable for this Mac *and* already downloaded — a model that could run here
+    /// but hasn't been fetched yet in Settings is not ready, same as a remote provider missing
+    /// its endpoint or API key.
+    @MainActor
+    private static func isLocalMlxModelReady(modelKey: String) -> Bool {
+        guard let descriptor = LocalModelCatalogue.descriptor(for: modelKey) else { return false }
+        guard LocalModelSuitability.decision(for: descriptor) == .allowed else { return false }
+        return LocalModelStore.shared.isInstalled(descriptor)
     }
 
     @MainActor
@@ -56,6 +68,19 @@ enum AIEngineFactory {
                 return .unavailable(reason: "Requires macOS 27 or later.")
             }
             return .ready(OnDeviceAIEngine(systemPrompt: systemPrompt))
+
+        case .localMlx(let modelKey):
+            guard let descriptor = LocalModelCatalogue.descriptor(for: modelKey) else {
+                return .unavailable(reason: "This on-device model is no longer offered.")
+            }
+            let decision = LocalModelSuitability.decision(for: descriptor)
+            guard decision == .allowed else {
+                return .unavailable(reason: decision.unavailableReason ?? "This Mac can't run \(descriptor.name).")
+            }
+            guard LocalModelStore.shared.isInstalled(descriptor) else {
+                return .unavailable(reason: "\(descriptor.name) hasn't been downloaded yet — download it in Settings.")
+            }
+            return .ready(MLXAIEngine(descriptor: descriptor, systemPrompt: systemPrompt))
 
         case .remote:
             guard let (endpoint, apiKey, model) = remoteConfiguration(for: definition, settings: settings) else {
