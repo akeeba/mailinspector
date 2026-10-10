@@ -177,10 +177,12 @@ nonisolated enum ReceivedHeaderParser {
     }
 
     /// True when `text` is nothing but a single bracketed IP literal (optionally with the
-    /// `IPv6:` prefix) — e.g. `"[127.0.0.1]"` or `"[IPv6:::1]"` — with no actual hostname text
+    /// `IPv6:` prefix, and optionally followed by a `:port` — e.g. a from-clause address written
+    /// as `host:port`, such as `"[195.154.224.40]:12476"`) — with no actual hostname text
     /// alongside it.
     private static func isBracketedIPLiteral(_ text: String) -> Bool {
-        text.hasPrefix("[") && text.hasSuffix("]") && extractBracketedAddress(text) != nil
+        guard let ip = extractBracketedAddress(text) else { return false }
+        return stripBracketedAddressAndPort(text, address: ip).trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     /// Finds the first `(...)` group, respecting nesting, and returns its inner content plus
@@ -221,10 +223,11 @@ nonisolated enum ReceivedHeaderParser {
             }
             return (trimmed, nil)
         }
-        let withoutBracket = inner
-            .replacingOccurrences(of: "[\(ip)]", with: "")
-            .replacingOccurrences(of: "[IPv6:\(ip)]", with: "", options: .caseInsensitive)
-            .trimmingCharacters(in: .whitespaces)
+        // Exim writes this remark as "(verified [ip]:port)" — the port of the connecting socket,
+        // not part of any hostname. Only stripping the bracketed "[ip]" literal left the leading
+        // ":port" behind (e.g. ":12476"), which then got reported as the "verified" hostname and
+        // produced a false mismatch against the claimed hostname on every hop of this shape.
+        let withoutBracket = stripBracketedAddressAndPort(inner, address: ip).trimmingCharacters(in: .whitespaces)
         return (withoutBracket.isEmpty ? nil : withoutBracket, ip)
     }
 
@@ -237,6 +240,18 @@ nonisolated enum ReceivedHeaderParser {
             address = String(address.dropFirst(5))
         }
         return address
+    }
+
+    /// Removes a `[address]` or `[IPv6:address]` literal, and an immediately-following `:port`
+    /// suffix if present (e.g. `"[195.154.224.40]:12476"`), from `text`.
+    private static func stripBracketedAddressAndPort(_ text: String, address: String) -> String {
+        let escapedAddress = NSRegularExpression.escapedPattern(for: address)
+        let pattern = "\\[(?:IPv6:)?\(escapedAddress)\\](?::\\d+)?"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return text
+        }
+        let ns = text as NSString
+        return regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: ns.length), withTemplate: "")
     }
 
     private static func firstToken(_ text: String) -> String? {
