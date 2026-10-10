@@ -11,8 +11,9 @@ import Foundation
 
 /// Tests for `SpamLikelihoodAnalyzer`: rescaling various mail-filter spam-scoring headers
 /// (X-Spam-Score, X-Spam-Status, Exchange SCL, Rspamd, X-MBO-SPAM-Probability) onto a common
-/// 0-100 gauge, falling through to the next recognized source when one is blank, and returning
-/// nil when no recognized header is present at all.
+/// 0-100 gauge, falling through to the next recognized source when one is blank, preferring
+/// X-Spam-Status over X-Spam-Score when both are present (see `prefersStatusOverAmbiguousScore`
+/// for why), and returning nil when no recognized header is present at all.
 @Suite("SpamLikelihoodAnalyzer")
 struct SpamLikelihoodAnalyzerTests {
     @Test("Rescales an X-Spam-Score onto a 0-100 gauge")
@@ -29,6 +30,19 @@ struct SpamLikelihoodAnalyzerTests {
         let assessment = SpamLikelihoodAnalyzer.assess(parsed: message.parsed)
         #expect(assessment?.sourceHeaderName == "X-Spam-Status")
         #expect(assessment?.percentage == 13.5)
+    }
+
+    @Test("Prefers X-Spam-Status's self-labeled score over X-Spam-Score when both are present and disagree")
+    func prefersStatusOverAmbiguousScore() throws {
+        // A real header set from a cPanel/Exim host (directrouter.com): X-Spam-Status's
+        // score=0.9 is SpamAssassin's own decimal score, but the same message's X-Spam-Score
+        // header is "9" — that host writes it as the score times 10, not the raw decimal value.
+        // Treating X-Spam-Score as authoritative here previously produced 70% ("High") for a
+        // message SpamAssassin itself scored as 0.9 out of a required 5.0 ("No", clearly ham).
+        let message = try makeTestMessage("X-Spam-Status: No, score=0.9 required=5.0 tests=NONE\r\nX-Spam-Score: 9\r\n\r\n")
+        let assessment = SpamLikelihoodAnalyzer.assess(parsed: message.parsed)
+        #expect(assessment?.sourceHeaderName == "X-Spam-Status")
+        #expect(abs((assessment?.percentage ?? 0) - 29.5) < 0.001)
     }
 
     @Test("Rescales Exchange's Spam Confidence Level onto a 0-100 gauge")

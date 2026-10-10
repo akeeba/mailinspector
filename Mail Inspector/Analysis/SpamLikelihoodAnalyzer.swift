@@ -25,14 +25,20 @@ nonisolated struct SpamLikelihoodAssessment: Sendable {
 /// different filters can be shown the same way.
 nonisolated enum SpamLikelihoodAnalyzer {
     static func assess(parsed: ParsedEmail) -> SpamLikelihoodAssessment? {
-        if let header = parsed.firstHeader(named: "X-Spam-Score"),
-           let score = Double(header.unfoldedValue.trimmingCharacters(in: .whitespaces)) {
-            return assessment(fromSpamAssassinStyleScore: score, headerName: "X-Spam-Score", rawValue: header.unfoldedValue)
-        }
-
+        // X-Spam-Status's "score=" is SpamAssassin's own self-labeled, uniformly-decimal
+        // convention — checked first because it's unambiguous. X-Spam-Score is a convenience
+        // header with no fixed spec: most hosts mirror the same decimal score, but at least one
+        // real-world host (cPanel/Exim via directrouter.com) has been observed writing it as the
+        // score multiplied by 10 with no decimal point (e.g. "9" for an actual score of 0.9),
+        // which silently produced a wildly inflated reading when this ran first.
         if let header = parsed.firstHeader(named: "X-Spam-Status"),
            let score = extractScore(fromStatusLine: header.unfoldedValue) {
             return assessment(fromSpamAssassinStyleScore: score, headerName: "X-Spam-Status", rawValue: "score=\(score)")
+        }
+
+        if let header = parsed.firstHeader(named: "X-Spam-Score"),
+           let score = Double(header.unfoldedValue.trimmingCharacters(in: .whitespaces)) {
+            return assessment(fromSpamAssassinStyleScore: score, headerName: "X-Spam-Score", rawValue: header.unfoldedValue)
         }
 
         if let header = parsed.firstHeader(named: "X-MS-Exchange-Organization-SCL"),

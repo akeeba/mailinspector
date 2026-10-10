@@ -36,13 +36,11 @@ struct InspectorSettingsTests {
         }
     }
 
-    @Test("Upgrades a stored prompt that still exactly matches a previous default")
-    func upgradesLegacyDefault() {
-        guard let legacyPrompt = MessageInsightsSession.legacyDefaultInstructions.first else {
-            Issue.record("No legacy prompt recorded to test against")
-            return
-        }
-        withStoredPrompt(legacyPrompt) {
+    @Test("Upgrades a stored prompt that still exactly matches a previous default", arguments: [0, 1])
+    func upgradesLegacyDefault(index: Int) throws {
+        let legacyPrompts = MessageInsightsSession.legacyDefaultInstructions
+        try #require(legacyPrompts.count > index)
+        withStoredPrompt(legacyPrompts[index]) {
             let settings = InspectorSettings()
             #expect(settings.aiSystemPrompt == MessageInsightsSession.defaultInstructions)
         }
