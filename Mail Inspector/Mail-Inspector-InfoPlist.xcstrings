@@ -1,0 +1,246 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mail Inspector"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mail Inspector"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector"
+          }
+        }
+      }
+    },
+    "NSHumanReadableCopyright" : {
+      "comment" : "Copyright (human-readable)",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Copyright © 2026 Nicholas K. Dionysopoulos / Akeeba Ltd"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector kann Nachrichten mit einem lokal gehosteten AI-Modell (z. B. LM Studio) auf deinem Mac oder lokalen Netzwerk analysieren, sofern du eines in den Einstellungen konfigurierst."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Το Mail Inspector μπορεί να αναλύει μηνύματα χρησιμοποιώντας ένα τοπικά φιλοξενούμενο μοντέλο AI (όπως το LM Studio) στον Mac σας ή σε τοπικό δίκτυο, αν διαμορφώσετε ένα στις Ρυθμίσεις."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mail Inspector can analyze messages using a locally-hosted AI model (such as LM Studio) on your Mac or local network, if you configure one in Settings."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector can analyse messages using a locally-hosted AI model (such as LM Studio) on your Mac or local network, if you configure one in Settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector puede analizar los mensajes con un modelo de AI alojado localmente (como LM Studio) en tu Mac o en la red local, si configuras uno en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector peut analyser les messages à l’aide d’un modèle AI hébergé localement (comme LM Studio) sur votre Mac ou sur le réseau local, si vous en configurez un dans les réglages."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mail Inspector kan berichten analyseren met een lokaal gehost AI-model (zoals LM Studio) op je Mac of in je lokale netwerk, als je er een configureert in Instellingen."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "O Mail Inspector pode analisar mensagens utilizando um modelo de AI alojado localmente (como o LM Studio) no Mac ou na rede local, se configurar um nas Definições."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ayarlar’da yapılandırmanız durumunda Mail Inspector, Mac’inizdeki veya yerel ağınızdaki yerel olarak barındırılan bir AI modelini (örneğin LM Studio) kullanarak iletileri analiz edebilir."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

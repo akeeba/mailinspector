@@ -24,3 +24,7 @@
   etc.) or changes the behavior of one already described in `README.md`, update `README.md` in
   the same change: add a new bullet for a new feature, or edit the existing one if behavior
   changed (default value, requirements, wording). Don't leave it for a later pass.
+- Any new or modified user-facing string (in a String Catalog, Info.plist, or elsewhere) must be
+  translated into all of the app's supported languages in the same change: English (UK, `en-GB`),
+  Greek (`el`), German (`de`), Dutch (`nl`), French (`fr`), Spanish (`es`), Portuguese — Portugal
+  (`pt-PT`), and Turkish (`tr`). Don't leave strings untranslated for a later pass.
