@@ -258,7 +258,15 @@ final class InspectorSettings {
         }
         aiProviderEndpoints = UserDefaults.standard.dictionary(forKey: Self.aiProviderEndpointsKey) as? [String: String] ?? [:]
         aiProviderModelNames = UserDefaults.standard.dictionary(forKey: Self.aiProviderModelNamesKey) as? [String: String] ?? [:]
-        aiSystemPrompt = UserDefaults.standard.string(forKey: Self.aiSystemPromptKey) ?? MessageInsightsSession.defaultInstructions
+        let storedSystemPrompt = UserDefaults.standard.string(forKey: Self.aiSystemPromptKey)
+        if let storedSystemPrompt, MessageInsightsSession.legacyDefaultInstructions.contains(storedSystemPrompt) {
+            // Silently upgrades a prompt that's still exactly one of our own past defaults —
+            // never one the user has actually edited, even slightly — so fixes like the
+            // Unknown-verdict weighting reach people who never open Settings to hit "Reset Prompt".
+            aiSystemPrompt = MessageInsightsSession.defaultInstructions
+        } else {
+            aiSystemPrompt = storedSystemPrompt ?? MessageInsightsSession.defaultInstructions
+        }
         aiProviderPrompts = UserDefaults.standard.dictionary(forKey: Self.aiProviderPromptsKey) as? [String: String] ?? [:]
         aiProviderContextLengths = UserDefaults.standard.dictionary(forKey: Self.aiProviderContextLengthsKey) as? [String: Int] ?? [:]
         trustedReplyToDomainsBySender = UserDefaults.standard.dictionary(forKey: Self.trustedReplyToDomainsBySenderKey) as? [String: [String]] ?? [:]
